@@ -66,6 +66,8 @@ class DuET:
         model = DuETModel()
         model.load_state_dict(load_file(str(weights), device="cpu"), strict=True)
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        model = torch.compile(model)
+        print('Model was successfully compiled in eager mode!')
         return cls(model, metadata, device)
 
     def transcribe_audio(self, audio, output_dir, *, progress=None, audio_model=None):
