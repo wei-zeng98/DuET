@@ -4,6 +4,7 @@
   <a href="https://arxiv.org/abs/2610.21467"><img src="https://img.shields.io/badge/DuET%20Paper-arXiv-B31B1B?style=flat-square" alt="DuET Paper: arXiv"></a>
   <a href="https://huggingface.co/Wayne42/DuET"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20DuET%20Weights-Hugging%20Face-FFD21E?style=flat-square" alt="DuET Weights: Hugging Face"></a>
   <a href="https://huggingface.co/spaces/Wayne42/DuET-demo"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20DuET%20Demo-Hugging%20Face-76B900?style=flat-square" alt="DuET Demo: Hugging Face"></a>
+  <a href="https://huggingface.co/datasets/Wayne42/gangqinpu"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Gangqinpu%20Dataset-Hugging%20Face-FFD21E?style=flat-square" alt="Gangqinpu Dataset: Hugging Face"></a>
 </p>
 
 <p align="center">
