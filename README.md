@@ -79,13 +79,15 @@ hf auth login
 
 | File | Contents |
 | --- | --- |
-| `score.musicxml` | Structured notation with score timing, staff and voice assignments, meter, key signatures, and grace notes |
+| `score.musicxml` | Readable piano notation using the demo’s engraving 0.9.1 defaults; title is the input filename without its extension |
 | `score.mid` | Listening MIDI with separate upper- and lower-staff tracks |
 | `notes.json` | Raw note-aligned predictions with input-note identities |
-| `report.json` | Model identity, input cleanup, window coverage, and export statistics |
+| `report.json` | Model identity, input cleanup, window coverage, MIDI statistics, and readable engraving version/summary |
 | `performance.mid` | Intermediate Transkun output, for audio input only |
 
-Open `score.musicxml` in MuseScore or another notation editor for engraving and further editing. The inference library writes MusicXML directly; MuseScore is not required for command-line transcription.
+Open `score.musicxml` in MuseScore or another notation editor. Both MIDI and audio commands now apply the same readable engraving as the online demo. The title comes from the original input filename, without `.mid`, `.wav`, or another final extension. MuseScore is not required, and these commands do not generate PDF files.
+
+Readable engraving adjusts notation for readability and can change note timing, grouping, and hand assignment. It does not change model weights, raw `notes.json`, or `score.mid`. The new `score.musicxml` is **not the raw metric XML used for the paper’s MUSTER/ScoreSimilarity evaluation**. The original serializer remains available as `duet.export.write_musicxml` for evaluation tooling. Intermediate engraving files are temporary and are not added to the output directory.
 
 DuET assigns one score record to each retained input note and copies its pitch from the input. Long performances are processed in 32-second regions with eight seconds of preceding context. Reference scores and training caches are not required.
 

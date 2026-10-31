@@ -14,7 +14,7 @@ jobs:
       - run: pip install '.[test]'
       - run: python -m unittest discover -s tests
   audio:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -55,7 +55,8 @@ jobs:
           DUET_SKIP_MODEL_LOAD: "1"
         run: |
           sudo apt-get update
-          xargs sudo apt-get install -y < demo/packages.txt
+          # Ubuntu 24 uses the t64 ALSA package; the Space uses Debian bookworm.
+          sed 's/^libasound2$/libasound2t64/' demo/packages.txt | xargs sudo apt-get install -y
           pip install gradio==5.49.1 spaces
           python - <<'PY'
           import runpy

@@ -10,7 +10,8 @@ from safetensors.torch import load_file
 
 from .assembly import assemble_records
 from .config import BUNDLE_FORMAT, CORE_SECONDS, HISTORY_SECONDS, MAX_NOTES, DuETConfig
-from .export import write_listening_midi, write_musicxml
+from .export import write_listening_midi
+from .engraving import predict_engraving_frames, write_readable_musicxml
 from .features import build_window
 from .midi import read_performance_midi
 from .model import DuETModel
@@ -90,7 +91,10 @@ class DuET:
             report.update(frontend=frontend, stage="midi_to_score")
             report_path.write_text(json.dumps(report, indent=2) + "\n")
             score_report = self.transcribe(
-                root / "performance.mid", score_dir, progress=progress
+                root / "performance.mid",
+                score_dir,
+                progress=progress,
+                title=Path(audio).stem,
             )
             report.update(score_report, stage="complete")
             return report
@@ -110,7 +114,7 @@ class DuET:
             report_path.write_text(json.dumps(report, indent=2) + "\n")
 
     @torch.inference_mode()
-    def transcribe(self, midi, output_dir, *, progress=None):
+    def transcribe(self, midi, output_dir, *, progress=None, title=None):
         """Generate all notes; fail explicitly on incomplete coverage or oversized windows.
 
         No reference score is required. Output directories must not already exist.
@@ -215,7 +219,18 @@ class DuET:
             report["midi"] = write_listening_midi(
                 self.model.codec, score, root / "score.mid"
             )
-            write_musicxml(score, root / "score.musicxml")
+            report["stage"] = "engraving"
+            report["score_title"] = title if title is not None else Path(midi).stem
+            save_report()
+            frames = predict_engraving_frames(self.model, data, self.device)
+            report["engraving"] = write_readable_musicxml(
+                score,
+                data,
+                frames,
+                root / "score.musicxml",
+                title=report["score_title"],
+            )
+            report["stage"] = "complete"
             report["status"] = "complete"
             return report
         except Exception as exc:
