@@ -314,5 +314,5 @@ def write(plan, ctx, path):
             w('<barline location="right"><bar-style>light-heavy</bar-style></barline>')
         w("</measure>")
     w("</part></score-partwise>")
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(out))
