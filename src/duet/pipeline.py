@@ -17,7 +17,12 @@ from .midi import read_performance_midi
 from .model import DuETModel
 
 
-def _sha256(path):
+def _sha256(path, *, normalize_newlines=False):
+    if normalize_newlines:
+        # Git may check text files out with CRLF on Windows. The released
+        # vocabulary checksum is based on the repository's canonical LF form.
+        data = Path(path).read_bytes().replace(b"\r\n", b"\n")
+        return hashlib.sha256(data).hexdigest()
     with Path(path).open("rb") as f:
         return hashlib.file_digest(f, "sha256").hexdigest()
 
@@ -47,7 +52,7 @@ class DuET:
                     allow_patterns=["config.json", "model.safetensors"],
                 )
             )
-        metadata = json.loads((path / "config.json").read_text())
+        metadata = json.loads((path / "config.json").read_text(encoding="utf-8"))
         if (
             metadata.get("format") != BUNDLE_FORMAT
             or metadata.get("architecture") != DuETConfig().to_dict()
@@ -58,7 +63,7 @@ class DuET:
                 "Model bundle is incompatible with this DuET package version."
             )
         if metadata.get("vocabulary_sha256") != _sha256(
-            Path(__file__).with_name("vocabulary.json")
+            Path(__file__).with_name("vocabulary.json"), normalize_newlines=True
         ):
             raise ValueError("Model vocabulary does not match the installed package.")
         weights = path / "model.safetensors"
@@ -80,7 +85,7 @@ class DuET:
         root.mkdir(parents=True, exist_ok=False)
         report_path = root / "report.json"
         report = {"status": "running", "input_type": "audio", "stage": "audio_to_midi"}
-        report_path.write_text(json.dumps(report, indent=2) + "\n")
+        report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         # The existing MIDI pipeline requires a new directory. Use a child and
         # publish its artifacts at the root after success or failure.
         score_dir = root / "score_stage"
@@ -89,7 +94,9 @@ class DuET:
                 audio, root / "performance.mid", device=self.device, model=audio_model
             )
             report.update(frontend=frontend, stage="midi_to_score")
-            report_path.write_text(json.dumps(report, indent=2) + "\n")
+            report_path.write_text(
+                json.dumps(report, indent=2) + "\n", encoding="utf-8"
+            )
             score_report = self.transcribe(
                 root / "performance.mid",
                 score_dir,
@@ -101,7 +108,7 @@ class DuET:
         except Exception as exc:
             stage_report = score_dir / "report.json"
             if stage_report.is_file():
-                report.update(json.loads(stage_report.read_text()))
+                report.update(json.loads(stage_report.read_text(encoding="utf-8")))
             report.update(status="failed", error=str(exc))
             raise
         finally:
@@ -111,7 +118,9 @@ class DuET:
                         artifact.rename(root / artifact.name)
                 (score_dir / "report.json").unlink(missing_ok=True)
                 score_dir.rmdir()
-            report_path.write_text(json.dumps(report, indent=2) + "\n")
+            report_path.write_text(
+                json.dumps(report, indent=2) + "\n", encoding="utf-8"
+            )
 
     @torch.inference_mode()
     def transcribe(self, midi, output_dir, *, progress=None, title=None):
@@ -132,7 +141,9 @@ class DuET:
         }
 
         def save_report():
-            (root / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+            (root / "report.json").write_text(
+                json.dumps(report, indent=2) + "\n", encoding="utf-8"
+            )
 
         save_report()
         try:
@@ -215,7 +226,9 @@ class DuET:
                 raise ValueError("Full-piece input coverage is incomplete.")
             score, stats = assemble_records(self.model.codec, records)
             report.update(stats, input_notes=len(on), input_coverage=1.0)
-            (root / "notes.json").write_text(json.dumps(records) + "\n")
+            (root / "notes.json").write_text(
+                json.dumps(records) + "\n", encoding="utf-8"
+            )
             report["midi"] = write_listening_midi(
                 self.model.codec, score, root / "score.mid"
             )

@@ -26,7 +26,9 @@ class Codec:
     ppq = 480
 
     def __init__(self):
-        v = json.loads((Path(__file__).parent / "vocabulary.json").read_text())
+        v = json.loads(
+            (Path(__file__).parent / "vocabulary.json").read_text(encoding="utf-8")
+        )
         self.tick_values = {
             k: np.array(v[k + "_ticks"], dtype=np.int64)
             for k in ("duration", "bar_length")
