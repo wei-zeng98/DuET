@@ -7,6 +7,18 @@ from pathlib import Path
 import torch
 from .pipeline import DuET
 
+DEFAULT_MODEL = "Wayne42/DuET"
+
+
+def _default_output(input_path):
+    """results/<input stem> in the current directory, numbered if it already exists."""
+    base = Path("results") / Path(input_path).stem
+    candidate, n = base, 2
+    while candidate.exists():
+        candidate = base.with_name(f"{base.name}_{n}")
+        n += 1
+    return candidate
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -18,10 +30,15 @@ def main():
     )
     parser.add_argument(
         "--model",
-        required=True,
-        help="Hugging Face model repository or downloaded model directory",
+        default=DEFAULT_MODEL,
+        help="Hugging Face model repository or downloaded model directory "
+        f"(default: {DEFAULT_MODEL})",
     )
-    parser.add_argument("--output", required=True, help="New output directory")
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="New output directory (default: results/<input name>, numbered if taken)",
+    )
     parser.add_argument(
         "--device", default=None, help="Default: CUDA when available, otherwise CPU"
     )
@@ -33,6 +50,7 @@ def main():
     args = parser.parse_args()
     if args.threads < 1:
         parser.error("--threads must be positive")
+    output = Path(args.output) if args.output else _default_output(args.input)
     torch.set_num_threads(args.threads)
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
@@ -49,9 +67,9 @@ def main():
         )
         transcribe = model.transcribe if is_midi else model.transcribe_audio
         report = transcribe(
-            args.input, args.output, progress=lambda w: print(json.dumps(w), flush=True)
+            args.input, output, progress=lambda w: print(json.dumps(w), flush=True)
         )
-        print(f"Saved {report['input_notes']} note predictions to {args.output}")
+        print(f"Saved {report['input_notes']} note predictions to {output}")
     except Exception as exc:
         print(f"DuET: {exc}", file=sys.stderr)
         return 1

@@ -42,16 +42,18 @@ The audio frontend requires a compatible PyTorch and torchaudio installation. MI
 Transcribe a performance MIDI file:
 
 ```bash
-duet performance.mid --model Wayne42/DuET --output results/piece
+duet performance.mid
 ```
 
 With the audio dependencies installed:
 
 ```bash
-duet piano.wav --model Wayne42/DuET --output results/audio_piece
+duet piano.wav
 ```
 
-The model is downloaded from Hugging Face on first use and cached locally. CUDA is selected when available; add `--device cpu` to run on CPU. Each output directory must be new. Existing results are never overwritten.
+Results are written to `results/<input name>/` (e.g. `results/performance/`, `results/piano/`); if that directory already exists, a numbered one such as `results/performance_2/` is used instead. Pass `-o/--output DIR` to choose the directory yourself; an explicit output directory must be new. Existing results are never overwritten.
+
+The `Wayne42/DuET` model is used by default; it is downloaded from Hugging Face on first use and cached locally. Use `--model` to point at another repository or a local model directory. CUDA is selected when available; add `--device cpu` to run on CPU.
 
 ### Python
 
@@ -59,10 +61,10 @@ The model is downloaded from Hugging Face on first use and cached locally. CUDA 
 from duet import DuET
 
 model = DuET.from_pretrained("Wayne42/DuET")
-report = model.transcribe("performance.mid", "results/piece")
+report = model.transcribe("performance.mid", "results/performance")
 
 # Optional: piano audio through Transkun v2, followed by DuET.
-report = model.transcribe_audio("piano.wav", "results/audio_piece")
+report = model.transcribe_audio("piano.wav", "results/piano")
 ```
 
 Set `device="cuda"` or `device="cpu"` in `from_pretrained` to select the inference device explicitly.
