@@ -84,6 +84,8 @@ hf auth login
 | `score.musicxml` | Readable piano notation using the demo’s engraving 0.9.1 defaults; title is the input filename without its extension |
 | `score.mid` | Listening MIDI with separate upper- and lower-staff tracks |
 | `notes.json` | Raw note-aligned predictions with input-note identities |
+| `score.npz` | Raw assembled score arrays before readable engraving: `notes` columns are pitch (MIDI), onset (quarter notes), duration (quarter notes), and staff (0 upper, 1 lower); also includes `bar_starts`, `bar_lengths` (quarter notes), `meters`, `voices`, `keys` (key-signature fifths), `note_order`, `is_grace`, and `schema`. Load with `numpy.load(path, allow_pickle=False)` |
+| `frames.csv` | Model frame predictions at 50 Hz in performance seconds: `performance_time_sec`, `p_background`, `p_ordinary_beat`, `p_downbeat`, `p_any_beat` (ordinary beat + downbeat), `phase_cos_raw`, `phase_sin_raw`, and `bar_phase_0_1`; the same frame data used for readable engraving |
 | `report.json` | Model identity, input cleanup, window coverage, MIDI statistics, and readable engraving version/summary |
 | `performance.mid` | Intermediate Transkun output, for audio input only |
 

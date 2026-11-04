@@ -77,7 +77,7 @@ class EngravingTests(unittest.TestCase):
             )
             self.assertEqual(
                 {p.name for p in output.iterdir()},
-                {"score.mid", "score.musicxml", "notes.json", "report.json"},
+                {"score.mid", "score.musicxml", "notes.json", "report.json", "score.npz", "frames.csv"},
             )
             xml = ET.parse(output / "score.musicxml")
             self.assertEqual(xml.findtext("work/work-title"), "曲目 & test")
@@ -134,6 +134,8 @@ class EngravingTests(unittest.TestCase):
                     "notes.json",
                     "report.json",
                     "performance.mid",
+                    "score.npz",
+                    "frames.csv",
                 },
             )
 

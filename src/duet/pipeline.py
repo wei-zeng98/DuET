@@ -226,6 +226,18 @@ class DuET:
                 raise ValueError("Full-piece input coverage is incomplete.")
             score, stats = assemble_records(self.model.codec, records)
             report.update(stats, input_notes=len(on), input_coverage=1.0)
+            np.savez_compressed(
+                root / "score.npz",
+                schema=np.asarray("apt_whole_score_v1"),
+                notes=score.notes,
+                bar_starts=score.bar_starts,
+                bar_lengths=score.bar_lengths,
+                meters=np.asarray(score.meters, dtype=str),
+                voices=score.voices,
+                keys=score.keys,
+                note_order=score.note_order,
+                is_grace=score.notes[:, 2] == 0,
+            )
             (root / "notes.json").write_text(
                 json.dumps(records) + "\n", encoding="utf-8"
             )
@@ -236,6 +248,7 @@ class DuET:
             report["score_title"] = title if title is not None else Path(midi).stem
             save_report()
             frames = predict_engraving_frames(self.model, data, self.device)
+            frames.to_csv(root / "frames.csv", index=False)
             report["engraving"] = write_readable_musicxml(
                 score,
                 data,
