@@ -9,6 +9,7 @@ import pandas as pd
 import torch
 
 from .config import CORE_SECONDS
+from .readable import __version__
 from .features import build_window
 
 COLUMNS = (
@@ -71,7 +72,8 @@ def predict_engraving_frames(model, data, device):
 
 
 def write_readable_musicxml(score, data, frames, path, *, title):
-    """Publish only a complete readable XML; raw model arrays are copied first."""
+    """Publish only a complete readable XML; raw model arrays are copied first.
+    The places the engraving was not sure about go next to it as review.json."""
     from .readable.inputs import Inputs
     from .readable.pipeline import run
 
@@ -80,10 +82,12 @@ def write_readable_musicxml(score, data, frames, path, *, title):
     with tempfile.TemporaryDirectory(prefix=".readable-", dir=path.parent) as temp:
         xml, summary = run(inputs, temp, title=title)
         ET.parse(xml)
+        review = Path(temp) / "score.review.json"
+        if review.exists():
+            review.replace(path.parent / "review.json")
         Path(xml).replace(path)
     return {
-        "version": "1.0.0",
-        "upstream": "0.9.1",
+        "version": __version__,
         "mode": "readable",
         "title": title,
         "summary": summary,

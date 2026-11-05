@@ -1,5 +1,4 @@
 """Shared run state."""
-
 from bisect import bisect_right
 from dataclasses import dataclass, field
 from fractions import Fraction as F
@@ -12,24 +11,17 @@ class Bars:
 
     def __init__(self, starts, sigs, lengths=None):
         self.starts = [F(s) for s in starts]
-        self.sigs = list(sigs)  # (num, den) per bar
-        self.lens = (
-            [F(v) for v in lengths]
-            if lengths is not None
-            else [F(n * 4, d) for n, d in self.sigs]
-        )
+        self.sigs = list(sigs)                      # (num, den) per bar
+        self.lens = ([F(v) for v in lengths] if lengths is not None
+                     else [F(n * 4, d) for n, d in self.sigs])
         if not (len(self.starts) == len(self.sigs) == len(self.lens)):
-            raise ValueError("Bar starts, signatures and lengths must have equal size")
-        if any(v <= 0 for v in self.lens) or any(
-            b <= a for a, b in zip(self.starts, self.starts[1:])
-        ):
-            raise ValueError("Bar starts must increase and lengths must be positive")
+            raise ValueError('Bar starts, signatures and lengths must have equal size')
+        if any(v <= 0 for v in self.lens) or any(b <= a for a, b in zip(self.starts, self.starts[1:])):
+            raise ValueError('Bar starts must increase and lengths must be positive')
         # first half-bar index of every bar (2-quarter windows from each bar line)
         self.half_base = [0]
         for L in self.lens:
-            self.half_base.append(
-                self.half_base[-1] + -(-L.numerator // (2 * L.denominator))
-            )
+            self.half_base.append(self.half_base[-1] + -(-L.numerator // (2 * L.denominator)))
 
     @classmethod
     def uniform(cls, nbars, num, den):
@@ -64,16 +56,16 @@ class Bars:
 class Ctx:
     cfg: Config
     log: Callable
-    B: int = 4  # quarter notes per bar of the main meter (4/4 -> 4, 6/8 -> 3)
+    B: int = 4                 # quarter notes per bar of the main meter (4/4 -> 4, 6/8 -> 3)
     beat_type: int = 4
-    num: int = 4  # time signature numerator of the main meter
-    pulse: F = F(1)  # quarters per felt beat (compound: 3/2)
+    num: int = 4               # time signature numerator of the main meter
+    pulse: F = F(1)            # quarters per felt beat (compound: 3/2)
     compound: bool = False
-    swing: object = None  # median off-beat position when the piece is swung
+    swing: object = None       # median off-beat position when the piece is swung
     nbars: int = 0
-    pickup: F = F(0)  # length of the leading empty part of bar 0 (0 = no pickup)
-    keys: list = field(default_factory=list)  # fifths per bar
-    title: str = ""
+    pickup: F = F(0)           # length of the leading empty part of bar 0 (0 = no pickup)
+    keys: list = field(default_factory=list)   # fifths per bar
+    title: str = ''
     bars: Bars = None
 
     @property

@@ -1,3 +1,3 @@
-"""Readable piano engraving, derived from engraving 0.9.1 defaults."""
+"""Readable piano engraving: engraving 1.1.0 (the same version as the engraving project)."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"

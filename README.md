@@ -81,17 +81,18 @@ hf auth login
 
 | File | Contents |
 | --- | --- |
-| `score.musicxml` | Readable piano notation using the demo’s engraving 0.9.1 defaults; title is the input filename without its extension |
+| `score.musicxml` | Readable piano notation from engraving 1.1.0 (key signatures and spelling of notes outside the key are taken from the notes, brushed notes in fast runs become grace notes); title is the input filename without its extension |
+| `review.json` | Places the engraving was not sure about (key changes, borrowed chords vs modulation, low-margin spellings, runs to re-space, free runs that may be tuplets, notes written away from where they were played), each with the edits for its possible answers; read by the engraving project's `engrave-polish` review tools |
 | `score.mid` | Listening MIDI with separate upper- and lower-staff tracks |
 | `notes.json` | Raw note-aligned predictions with input-note identities |
 | `score.npz` | Raw assembled score arrays before readable engraving: `notes` columns are pitch (MIDI), onset (quarter notes), duration (quarter notes), and staff (0 upper, 1 lower); also includes `bar_starts`, `bar_lengths` (quarter notes), `meters`, `voices`, `keys` (key-signature fifths), `note_order`, `is_grace`, and `schema`. Load with `numpy.load(path, allow_pickle=False)` |
 | `frames.csv` | Model frame predictions at 50 Hz in performance seconds: `performance_time_sec`, `p_background`, `p_ordinary_beat`, `p_downbeat`, `p_any_beat` (ordinary beat + downbeat), `phase_cos_raw`, `phase_sin_raw`, and `bar_phase_0_1`; the same frame data used for readable engraving |
-| `report.json` | Model identity, input cleanup, window coverage, MIDI statistics, and readable engraving version/summary |
+| `report.json` | Model identity, input cleanup, window coverage, MIDI statistics, and readable engraving version (`1.1.0`)/summary |
 | `performance.mid` | Intermediate Transkun output, for audio input only |
 
 Open `score.musicxml` in MuseScore or another notation editor. Both MIDI and audio commands now apply the same readable engraving as the online demo. The title comes from the original input filename, without `.mid`, `.wav`, or another final extension. MuseScore is not required, and these commands do not generate PDF files.
 
-Readable engraving adjusts notation for readability and can change note timing, grouping, and hand assignment. It does not change model weights, raw `notes.json`, or `score.mid`. The new `score.musicxml` is **not the raw metric XML used for the paper’s MUSTER/ScoreSimilarity evaluation**. The original serializer remains available as `duet.export.write_musicxml` for evaluation tooling. Intermediate engraving files are temporary and are not added to the output directory.
+Readable engraving adjusts notation for readability and can change note timing, grouping, and hand assignment. It does not change model weights, raw `notes.json`, or `score.mid`. The new `score.musicxml` is **not the raw metric XML used for the paper’s MUSTER/ScoreSimilarity evaluation**. The original serializer remains available as `duet.export.write_musicxml` for evaluation tooling. Intermediate engraving files are temporary and are not added to the output directory; only `score.musicxml` and `review.json` are kept.
 
 DuET assigns one score record to each retained input note and copies its pitch from the input. Long performances are processed in 32-second regions with eight seconds of preceding context. Reference scores and training caches are not required.
 

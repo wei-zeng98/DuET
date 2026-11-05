@@ -1,38 +1,21 @@
 """Key-aware pitch spelling and staff-position helpers."""
-
-STEPS = "CDEFGAB"
-STEP_PC = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+STEPS = 'CDEFGAB'
+STEP_PC = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 # major tonic for each number of fifths
-TONIC = {
-    -7: ("C", -1),
-    -6: ("G", -1),
-    -5: ("D", -1),
-    -4: ("A", -1),
-    -3: ("E", -1),
-    -2: ("B", -1),
-    -1: ("F", 0),
-    0: ("C", 0),
-    1: ("G", 0),
-    2: ("D", 0),
-    3: ("A", 0),
-    4: ("E", 0),
-    5: ("B", 0),
-    6: ("F", 1),
-    7: ("C", 1),
-}
+TONIC = {-7: ('C', -1), -6: ('G', -1), -5: ('D', -1), -4: ('A', -1), -3: ('E', -1), -2: ('B', -1), -1: ('F', 0),
+         0: ('C', 0), 1: ('G', 0), 2: ('D', 0), 3: ('A', 0), 4: ('E', 0), 5: ('B', 0), 6: ('F', 1), 7: ('C', 1)}
 MAJOR = [0, 2, 4, 5, 7, 9, 11]
+ACC_TXT = {-2: 'bb', -1: 'b', 0: '', 1: '#', 2: '##'}
 
 
 def key_alters(fifths):
     """step -> alteration implied by the key signature"""
-    order_sharp, order_flat = "FCGDAEB", "BEADGCF"
+    order_sharp, order_flat = 'FCGDAEB', 'BEADGCF'
     alt = {s: 0 for s in STEPS}
     if fifths > 0:
-        for s in order_sharp[:fifths]:
-            alt[s] = 1
+        for s in order_sharp[:fifths]: alt[s] = 1
     elif fifths < 0:
-        for s in order_flat[:-fifths]:
-            alt[s] = -1
+        for s in order_flat[:-fifths]: alt[s] = -1
     return alt
 
 
@@ -67,8 +50,14 @@ class Speller:
         self.key_alt = key_alters(fifths)
 
     def spell(self, p):
+        """(step, alter, octave) of a MIDI pitch, or of a note dict (its own 'spell' wins)"""
+        if isinstance(p, dict):
+            if p.get('spell'):
+                step, alt = p['spell']
+                return step, alt, (p['pitch'] - alt - STEP_PC[step]) // 12 - 1
+            p = p['pitch']
         step, alt = self.table[p % 12]
-        octave = (p - alt) // 12 - 1  # B#3 sounds as C4, Cb4 as B3
+        octave = (p - alt) // 12 - 1          # B#3 sounds as C4, Cb4 as B3
         return step, alt, octave
 
     def diat(self, p):
@@ -77,8 +66,8 @@ class Speller:
 
 
 _C = Speller(0)
-TREBLE = (_C.diat(64), _C.diat(77))  # E4 .. F5
-BASS = (_C.diat(43), _C.diat(57))  # G2 .. A3
+TREBLE = (_C.diat(64), _C.diat(77))   # E4 .. F5
+BASS = (_C.diat(43), _C.diat(57))     # G2 .. A3
 
 
 _DEFAULT = [_C]
@@ -90,6 +79,6 @@ def set_key(fifths):
 
 
 def ledgers(p, clef, speller=None):
-    lo, hi = TREBLE if clef == "G" else BASS
+    lo, hi = TREBLE if clef == 'G' else BASS
     d = (speller or _DEFAULT[0]).diat(p)
     return (lo - d) // 2 if d < lo else ((d - hi) // 2 if d > hi else 0)
