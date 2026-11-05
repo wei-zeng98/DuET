@@ -77,14 +77,17 @@ class EngravingTests(unittest.TestCase):
             )
             self.assertEqual(
                 {p.name for p in output.iterdir()},
-                {"score.mid", "score.musicxml", "notes.json", "report.json", "score.npz", "frames.csv"},
+                {"score.mid", "score.musicxml", "notes.json", "report.json", "score.npz", "frames.csv", "review.json"},
             )
             xml = ET.parse(output / "score.musicxml")
             self.assertEqual(xml.findtext("work/work-title"), "曲目 & test")
             self.assertEqual(len(xml.findall("part")), 1)
             self.assertEqual(xml.findtext(".//staves"), "2")
             self.assertEqual(report["engraving"]["mode"], "readable")
-            self.assertEqual(report["engraving"]["upstream"], "0.9.1")
+            self.assertEqual(report["engraving"]["version"], "1.1.0")
+            review = json.loads((output / "review.json").read_text(encoding="utf-8"))
+            self.assertEqual(review["title"], "曲目 & test")
+            self.assertIn("items", review)
             self.assertEqual(
                 report["midi_input_cleanup"]["nonpositive_duration_notes"], 1
             )
@@ -136,6 +139,7 @@ class EngravingTests(unittest.TestCase):
                     "performance.mid",
                     "score.npz",
                     "frames.csv",
+                    "review.json",
                 },
             )
 

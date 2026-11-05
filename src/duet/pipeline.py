@@ -74,12 +74,14 @@ class DuET:
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         return cls(model, metadata, device)
 
-    def transcribe_audio(self, audio, output_dir, *, progress=None, audio_model=None):
+    def transcribe_audio(self, audio, output_dir, *, progress=None, audio_model=None, engraving_config=None):
         """Audio -> performance.mid -> score.mid/MusicXML, using optional Transkun v2.
 
         A failed stage leaves a report and any completed intermediate MIDI.
         """
         from .audio import audio_to_midi
+        from .readable.config import Config
+        engraving_config = Config.resolve(engraving_config)
 
         root = Path(output_dir)
         root.mkdir(parents=True, exist_ok=False)
@@ -102,6 +104,7 @@ class DuET:
                 score_dir,
                 progress=progress,
                 title=Path(audio).stem,
+                engraving_config=engraving_config,
             )
             report.update(score_report, stage="complete")
             return report
@@ -123,11 +126,13 @@ class DuET:
             )
 
     @torch.inference_mode()
-    def transcribe(self, midi, output_dir, *, progress=None, title=None):
+    def transcribe(self, midi, output_dir, *, progress=None, title=None, engraving_config=None):
         """Generate all notes; fail explicitly on incomplete coverage or oversized windows.
 
         No reference score is required. Output directories must not already exist.
         """
+        from .readable.config import Config
+        engraving_config = Config.resolve(engraving_config)
         root = Path(output_dir)
         root.mkdir(parents=True, exist_ok=False)
         report = {
@@ -255,6 +260,7 @@ class DuET:
                 frames,
                 root / "score.musicxml",
                 title=report["score_title"],
+                cfg=engraving_config,
             )
             report["stage"] = "complete"
             report["status"] = "complete"

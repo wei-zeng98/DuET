@@ -47,7 +47,25 @@ def main():
         "--offline", action="store_true", help="Use only local/cached model files"
     )
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument("--engraving-config", type=Path, help="JSON object of engraving Config parameters")
+    for name in ('keys', 'spelling', 'runs'):
+        parser.add_argument('--auto-' + name, action=argparse.BooleanOptionalAction,
+                            default=None, help="Override automatic " + name + " (default: enabled)")
+    parser.add_argument('--key-switch', type=float, help="Penalty for a key-signature change")
+    parser.add_argument('--key-model-cost', type=float, help="Penalty per note for disagreeing with model keys")
     args = parser.parse_args()
+    from .readable.config import Config
+    try:
+        engraving = json.loads(args.engraving_config.read_text(encoding='utf-8')) if args.engraving_config else {}
+        if not isinstance(engraving, dict):
+            raise ValueError("Engraving configuration must be a JSON object")
+        for name in ('auto_keys', 'auto_spelling', 'auto_runs', 'key_switch', 'key_model_cost'):
+            value = getattr(args, name)
+            if value is not None:
+                engraving[name] = value
+        engraving = Config.from_dict(engraving)
+    except (ValueError, OSError) as exc:
+        parser.error(str(exc))
     if args.threads < 1:
         parser.error("--threads must be positive")
     output = Path(args.output) if args.output else _default_output(args.input)
@@ -67,7 +85,8 @@ def main():
         )
         transcribe = model.transcribe if is_midi else model.transcribe_audio
         report = transcribe(
-            args.input, output, progress=lambda w: print(json.dumps(w), flush=True)
+            args.input, output, progress=lambda w: print(json.dumps(w), flush=True),
+            engraving_config=engraving
         )
         print(f"Saved {report['input_notes']} note predictions to {output}")
     except Exception as exc:
