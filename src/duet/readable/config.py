@@ -1,7 +1,8 @@
-"""Tunable parameters. Every threshold the pipeline uses lives here so that a
-new piece can be tuned without touching the algorithms. Units: "beat" means one
+"""Runtime engraving controls, including independent automatic decisions and
+key/spelling costs. Units: "beat" means one
 notated beat (a quarter note in n/4 meters); "s" means seconds of performance."""
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+import math
 
 
 @dataclass
@@ -14,6 +15,7 @@ class Config:
     beat_refine_window: float = 0.06   # s; snap a beat time to the median of onsets this close
     beat_phase_tol: float = 0.25       # beats; a frame beat further than this from a model beat is off-beat
     phase_window_bars: int = 8         # window (bars) for downbeat evidence after a gap / diagnostics
+    snap_bar_lines: bool = True       # propose half-quarter bar-line snapping, roll back if topology changes
     grid_count_fix: bool = True        # let frame evidence change the model's beat count in gaps
     rewind_min: float = 1.5            # beats the model numbering must jump back to count as a rewind
     rewind_fit_s: float = 3.0          # seconds of earlier notes used to extend the earlier numbering
@@ -94,6 +96,19 @@ class Config:
     auto_keys: bool = True             # key signatures from the notes (keyfit) instead of the model's
     auto_spelling: bool = True         # notes outside the key spelled from harmony and line (spellfit)
     auto_runs: bool = True             # brushed notes in runs as grace notes, one-place overlaps cut
+    key_switch: float = 10.0
+    key_per_fifth: float = 0.3
+    key_model_cost: float = 0.05
+    key_borrowed_share: float = 0.3
+    key_borrowed_max_bars: int = 24
+    spelling_window: float = 2.0
+    spelling_w_key: float = 1.0
+    spelling_w_line: float = 3.0
+    spelling_passes: int = 2
+    spelling_w_sound: float = 1.0
+    spelling_w_odd: float = 0.0
+    spelling_line_prev: float = 0.0
+    spelling_review_margin: float = 1.5
     write_review: bool = True          # write <title>.review.json
 
     # ---- expression ---------------------------------------------------------
@@ -105,3 +120,47 @@ class Config:
     closing_bars: int = 4              # slow-downs reaching into the last bars stay a "rit."
     rit_ratio: float = 0.9             # bar tempo below ratio * current mark -> "rit."
     a_tempo_ratio: float = 0.96
+
+
+    def __post_init__(self):
+        for f in fields(self):
+            value = getattr(self, f.name)
+            if f.type is bool:
+                if type(value) is not bool:
+                    raise ValueError(f"{f.name} must be a boolean")
+            elif f.type in (int, float):
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    raise ValueError(f"{f.name} must be numeric")
+                if f.type is int and not isinstance(value, int):
+                    raise ValueError(f"{f.name} must be an integer")
+                if not math.isfinite(value) or value < 0:
+                    raise ValueError(f"{f.name} must be finite and nonnegative")
+            elif f.type is tuple:
+                if not isinstance(value, (tuple, list)) or len(value) != len(f.default):
+                    raise ValueError(f"{f.name} must contain {len(f.default)} numbers")
+                if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) for v in value):
+                    raise ValueError(f"{f.name} must contain finite numbers")
+        for name in ('spelling_window', 'spelling_passes', 'key_borrowed_max_bars'):
+            if getattr(self, name) <= 0:
+                raise ValueError(f"{name} must be positive")
+        if self.key_borrowed_share > 1:
+            raise ValueError("key_borrowed_share must be between zero and one")
+
+    @classmethod
+    def from_dict(cls, values):
+        if not isinstance(values, dict):
+            raise ValueError("Engraving configuration must be a JSON object")
+        unknown = set(values) - {f.name for f in fields(cls)}
+        if unknown:
+            raise ValueError(f"Unknown engraving parameters: {sorted(unknown)}")
+        return cls(**values)
+
+
+    @classmethod
+    def resolve(cls, values=None):
+        if values is None:
+            return cls()
+        if isinstance(values, cls):
+            values.__post_init__()
+            return values
+        return cls.from_dict(values)

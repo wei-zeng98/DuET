@@ -118,3 +118,10 @@ for MuseScore engraving behavior and maintainer deployment instructions.
 Code is licensed under [MIT](LICENSE). DuET model weights are separately licensed
 under [CC BY-NC 4.0](LICENSE-MODEL); the code license does not grant commercial
 use of the weights. See [licensing details](docs/LICENSING.md).
+
+
+Engraving controls: `--auto-keys/--no-auto-keys`,
+`--auto-spelling/--no-auto-spelling`, and `--auto-runs/--no-auto-runs` are
+independent (all enabled by default). Use `--key-switch`, `--key-model-cost`, or
+`--engraving-config config.json` for reproducible settings. See
+[runtime configuration](src/duet/readable/README.md#runtime-configuration).

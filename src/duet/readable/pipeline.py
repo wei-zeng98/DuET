@@ -1,5 +1,6 @@
 """End-to-end run: inputs -> grid -> quantize -> hands -> voices -> layout -> MusicXML."""
 import io
+from dataclasses import replace
 import os
 from collections import Counter, defaultdict
 from fractions import Fraction as F
@@ -46,6 +47,8 @@ def snap_model_bars(model_bars, q, log):
     the bar gets a length a time signature can express. q is changed in place."""
     starts = [F(b[0]).limit_denominator(48) for b in model_bars]
     snapped = [F(round(v * 2), 2) for v in starts]
+    if any(b <= a for a, b in zip(snapped, snapped[1:])):
+        raise BarMappingError("Half-beat snapping collapsed model bar boundaries")
     if snapped == starts:
         return model_bars
     ends = starts[1:] + [np.inf]
@@ -73,6 +76,10 @@ def sig_for_length(L, den):
     return None
 
 
+class BarMappingError(ValueError):
+    """A proposed grid changed bar topology; its entire attempt must be rejected."""
+
+
 def map_model_bars(model_bars, q_model, onsets, shift_at, last_on, ctx, quiet=False):
     """Move explicit bar boundaries with the grid. The first (pickup) and last bar
     may be partial: they keep their signature and are written as implicit measures.
@@ -89,7 +96,7 @@ def map_model_bars(model_bars, q_model, onsets, shift_at, last_on, ctx, quiet=Fa
         t = float(np.interp(float(q), uq, ut))
         st = F(float(q)).limit_denominator(480) + F(shift_at(t)).limit_denominator(480)
         # bar lines on half beats (snap_model_bars put the model's there; the grid shifts whole beats)
-        return F(round(st * 2), 2)
+        return F(round(st * 2), 2) if ctx.cfg.snap_bar_lines else st
 
     starts, sigs, ends = [], [], []
     for bar in model_bars:
@@ -97,11 +104,11 @@ def map_model_bars(model_bars, q_model, onsets, shift_at, last_on, ctx, quiet=Fa
         length = bar[3] if len(bar) > 3 else num * 4 / den
         st = moved(q0)
         if starts and st <= starts[-1]:
-            raise ValueError('Grid correction collapsed model bar boundaries')
+            raise BarMappingError('Grid correction collapsed model bar boundaries')
         starts.append(st); sigs.append((num, den)); ends.append(moved(q0 + length))
     lengths = [b - a for a, b in zip(starts, starts[1:])] + [ends[-1] - starts[-1]]
     if any(L <= 0 for L in lengths):
-        raise ValueError('Grid correction produced a nonpositive bar length')
+        raise BarMappingError('Grid correction produced a nonpositive bar length')
     while starts[0] > 0:
         L = F(sigs[0][0] * 4, sigs[0][1])
         starts.insert(0, starts[0] - L); sigs.insert(0, sigs[0]); lengths.insert(0, L)
@@ -124,9 +131,35 @@ def map_model_bars(model_bars, q_model, onsets, shift_at, last_on, ctx, quiet=Fa
 
 
 def run(inp, out_dir, title=None, cfg=None):
+    """Commit a valid engraving, retrying rejected count changes from fresh inputs."""
+    cfg = Config.resolve(cfg)
+    original = {k: v.copy() if isinstance(v, np.ndarray) else v for k, v in inp.score.items()}
+
+    def attempt(config):
+        fresh = replace(inp, score={k: v.copy() if isinstance(v, np.ndarray) else v
+                                    for k, v in original.items()})
+        return _run(fresh, out_dir, title, config)
+
+    try:
+        xml, summary = attempt(cfg)
+    except BarMappingError as exc:
+        if not cfg.grid_count_fix and not cfg.snap_bar_lines:
+            raise
+        xml, summary = attempt(replace(cfg, grid_count_fix=False, snap_bar_lines=False))
+        reason = str(exc)
+        summary['warnings'].append('WARNING grid: rejected count correction; '
+                                   'restarted with model bar boundaries: ' + reason)
+        summary['grid_fallback'] = dict(applied=True, reason=reason,
+                                        action='restart_with_original_bar_geometry')
+    else:
+        summary['grid_fallback'] = dict(applied=False)
+    return xml, summary
+
+
+def _run(inp, out_dir, title=None, cfg=None):
     """DuET: inputs come in memory (inputs.Inputs.from_prediction), the log stays in
     memory, and out_dir receives score.musicxml and score.review.json"""
-    cfg = cfg or Config()
+    cfg = Config.resolve(cfg)
     os.makedirs(out_dir, exist_ok=True)
     title = title or 'Piano score'
     stem = 'score'
@@ -140,10 +173,10 @@ def run(inp, out_dir, title=None, cfg=None):
     z = dict(z)
     z['notes'] = z['notes'].copy()
     z['notes'][:, 1], z['notes'][:, 2] = q_model, qd_model
-    if model_bars is not None:
+    if model_bars is not None and cfg.snap_bar_lines:
         model_bars = snap_model_bars(model_bars, z['notes'][:, 1], log)
     inp.score = z
-    ctx.B, ctx.num, ctx.beat_type = int(M.bar_q), M.num, M.den
+    ctx.B, ctx.num, ctx.beat_type = M.bar_q, M.num, M.den
     ctx.pulse, ctx.compound = M.pulse_q, M.compound
     B = ctx.B
 
@@ -154,7 +187,7 @@ def run(inp, out_dir, title=None, cfg=None):
             fr = inp.frames
             pk, _ = find_peaks(fr.p_any_beat.values, height=cfg.rewind_frame_conf, distance=cfg.beat_peak_distance)
             fb = (fr.performance_time_sec.values[pk], fr.p_downbeat.values[pk] > 0.5)
-        z['notes'][:, 1] = fix_rewinds(on, z['notes'][:, 1], B, cfg, log, fb)
+        z['notes'][:, 1] = fix_rewinds(on, z['notes'][:, 1], float(B), cfg, log, fb)
     # grid: model beat numbering fused with the frame pulse
     grid_bars = None if model_bars is None else (
         np.array([b[0] for b in model_bars]), np.array([b[3] for b in model_bars]))
@@ -184,7 +217,7 @@ def run(inp, out_dir, title=None, cfg=None):
         lead = F(int(first / ctx.pulse)) * ctx.pulse
         ctx.pickup = lead if 0 < lead < ctx.bars.length(0) else F(0)
     keys_model = [int(k) for k in z.get('keys', [0])]
-    starts = np.asarray(z.get('bar_starts', np.arange(len(keys_model)) * B), float)
+    starts = np.asarray(z.get('bar_starts', np.arange(len(keys_model)) * float(B)), float)
     old_pos = (lambda m: to_old(float(ctx.bars.start(m)) + 1e-6)) if model_bars is None else \
         (lambda m: model_bars[min(m, len(model_bars) - 1)][0] + 1e-6)
     ctx.keys = [keys_model[min(max(int(np.searchsorted(starts, old_pos(m), 'right')) - 1, 0), len(keys_model) - 1)]

@@ -26,7 +26,7 @@ def quantize(inp, G, shift_at, ctx):
     x = np.interp(on, G, idx)
     xo = np.interp(off, G, idx)
     # compound meters: model offsets come in whole felt beats, no triplet positions
-    U = float(ctx.pulse) if ctx.compound else 1.0
+    U = float(ctx.pulse)
     FR = [F(0), F(1, 4), F(1, 2), F(3, 4), F(1)] if ctx.compound else GRID_FRACS
     shifts = np.array([shift_at(t) for t in on])
     q = N[:, 1] + shifts; qd = N[:, 2]; staff = N[:, 3].astype(int)
@@ -272,7 +272,7 @@ def regular_runs(free, q, on, staff, mpos, x, cfg, ctx):
             ok = times[i + 1] > times[i] and 0 < step <= cfg.run_max_step and j - i + 1 >= cfg.run_min_events
             if ok:
                 # one integer offset for the whole run
-                U = float(ctx.pulse) if ctx.compound else 1.0
+                U = float(ctx.pulse)
                 offs = [U * round((x[k] - q[k]) / U) for qq in keys[i:j + 1] for k in ev[qq]]
                 off = float(np.median(offs)) if cfg.retime_outliers else 0.0
                 pos = {qq: qq for qq in keys[i:j + 1]}

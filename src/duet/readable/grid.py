@@ -187,7 +187,10 @@ def build_grid(frames, onsets, q, B, cfg, log, pulse=1, bars=None):
     meters). Internally everything is counted in pulses; G is returned per
     quarter note and shifts in quarters."""
     pulse = float(pulse)
+    B = float(B)
     if pulse != 1:
+        if not np.isclose(B / pulse, round(B / pulse), rtol=0, atol=1e-9):
+            raise ValueError("Meter must contain a whole number of grid pulses")
         Bp = int(round(B / pulse))
         Bp = Bp * 2 if Bp == 2 else Bp          # 6/8: judge bar phase over two bars (12/8)
         pulse_bars = None if bars is None else tuple(np.asarray(v) / pulse for v in bars)
@@ -199,7 +202,9 @@ def build_grid(frames, onsets, q, B, cfg, log, pulse=1, bars=None):
             return sh(t) * pulse
         shift_at.free = sh.free
         return G, shift_at
-    return _build_grid(frames, onsets, q, B, cfg, log, bars)
+    if not B.is_integer():
+        raise ValueError("Fractional bar lengths require their meter pulse")
+    return _build_grid(frames, onsets, q, int(B), cfg, log, bars)
 
 
 def _build_grid(frames, onsets, q, B, cfg, log, bars=None):
@@ -249,7 +254,7 @@ def _build_grid(frames, onsets, q, B, cfg, log, bars=None):
     # the off-beat 8ths advances at the right rate but is half a beat out
     onbeat = np.abs(m - r) < cfg.beat_phase_tol
     agree = (np.diff(r) == 1) & (np.abs(d - 1) < 0.35) & onbeat[:-1] & onbeat[1:]
-    if (~onbeat).mean() > 0.02:
+    if len(onbeat) and (~onbeat).mean() > 0.02:
         log(f"grid: {int((~onbeat).sum())} frame beats lie between model beats (off-beat pulse); model beat times used there")
     log(f"grid: {len(ks)} model beat anchors, {len(T)} frame beats, {agree.sum()}/{len(agree)} frame intervals agree with the model")
 

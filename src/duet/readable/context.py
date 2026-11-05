@@ -56,7 +56,7 @@ class Bars:
 class Ctx:
     cfg: Config
     log: Callable
-    B: int = 4                 # quarter notes per bar of the main meter (4/4 -> 4, 6/8 -> 3)
+    B: F = F(4)                 # quarter notes per bar of the main meter (4/4 -> 4, 6/8 -> 3)
     beat_type: int = 4
     num: int = 4               # time signature numerator of the main meter
     pulse: F = F(1)            # quarters per felt beat (compound: 3/2)

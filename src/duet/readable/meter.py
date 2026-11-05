@@ -10,7 +10,7 @@ meter is then the main meter used for the beat grid and quantization.
 
 All positions stay in quarter notes. For a meter n/d:
   bar_q   = quarters per bar        (4/4 -> 4, 6/8 -> 3, 12/8 -> 6)
-  pulse_q = quarters per felt beat  (simple -> 1, compound -> 3/2)
+  pulse_q = quarters per grid pulse (simple eighth -> 1/2, compound -> 3/2)
 """
 from collections import Counter
 from dataclasses import dataclass
@@ -34,7 +34,7 @@ class Meter:
 
     @property
     def pulse_q(self):
-        return F(3, 2) if self.compound else F(1)
+        return F(3, 2) if self.compound else (F(1, 2) if self.den == 8 else F(1))
 
     def __str__(self):
         return f"{self.num}/{self.den}"
@@ -95,7 +95,7 @@ def analyse(score, onsets, log):
     def keep_changes(reason):
         """genuine meter changes: keep the model's bar sequence"""
         main = parse(counts.most_common(1)[0][0])
-        if main.den == 8 and not main.compound or main.den not in (2, 4, 8):
+        if main.den not in (2, 4, 8):
             main = Meter(4, 4)
         log(f"WARNING meter: {reason}; keeping the model's meter changes {dict(counts)}, main meter {main}")
         lengths = score.get('bar_lengths', [float(parse(m).bar_q) for m in meters])
@@ -170,9 +170,7 @@ def meter_from_lengths(M, lengths, log, share=0.6):
 
 
 def check_supported(M):
-    if M.bar_q.denominator != 1:
-        raise NotImplementedError(f"meter {M}: bars must hold a whole number of quarters (supported: n/4, 6/8, 12/8)")
-    if M.den == 8 and not M.compound:
-        raise NotImplementedError(f"meter {M}: simple x/8 meters are not supported")
+    if M.num <= 0:
+        raise ValueError(f"meter {M}: numerator must be positive")
     if M.den not in (2, 4, 8):
         raise NotImplementedError(f"meter {M} is not supported")

@@ -36,7 +36,6 @@ from .spelling import Speller, ACC_TXT
 
 KEY_NAME = {-7: 'Cb', -6: 'Gb', -5: 'Db', -4: 'Ab', -3: 'Eb', -2: 'Bb', -1: 'F', 0: 'C',
             1: 'G', 2: 'D', 3: 'A', 4: 'E', 5: 'B', 6: 'F#', 7: 'C#'}
-SPELL_MARGIN = 1.5          # spelling decisions closer than this (line-of-fifths units) are listed
 
 
 def note_id(n):
@@ -73,9 +72,10 @@ class Review:
         counts = defaultdict(int)
         for it in items:
             counts[it['kind']] += 1
-        json.dump(dict(title=title, about="places the pipeline was not sure about; each option is an edits entry "
+        with open(path, 'w', encoding='utf-8') as handle:
+            json.dump(dict(title=title, about="places the pipeline was not sure about; each option is an edits entry "
                                           "(engrave/edits.py) to merge into <title>.edits.json",
-                       counts=counts, items=items), open(path, 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
+                       counts=counts, items=items), handle, indent=1, ensure_ascii=False)
 
 
 def key_changes(keys, ctx):
@@ -104,7 +104,8 @@ def auto_keys(notes, ctx, rv, log):
         if not n['grace'] and n['on'] - ctx.bars.start(m) < 1 and (bass[m] is None or n['pitch'] < bass[m]):
             bass[m] = n['pitch']
     model = list(ctx.keys)
-    prop, _ = keyfit.propose(bp, model)
+    prop, _ = keyfit.propose(bp, model, switch=ctx.cfg.key_switch,
+                             per_fifth=ctx.cfg.key_per_fifth, model_cost=ctx.cfg.key_model_cost)
     out_m, out_p = keyfit.outside(bp, model), keyfit.outside(bp, prop)
     for lo, hi, k in regions(prop):
         olds = sorted(set(model[lo:hi + 1]))
@@ -120,14 +121,15 @@ def auto_keys(notes, ctx, rv, log):
                f"key signature set to {KEY_NAME[k]}",
                [dict(label='keep', edit=None), dict(label="the model's key here", edit={'keys': key_changes(undo, ctx)})])
         log(f"auto keys: bars {rv.bars(range(lo, hi + 1))} {olds} -> {k}")
-    _, kept = keyfit.guard(prop, bass, share=0.3)
+    _, kept = keyfit.guard(prop, bass, share=ctx.cfg.key_borrowed_share,
+                            max_len=ctx.cfg.key_borrowed_max_bars)
     for lo, hi, k1, k0 in kept:
         alt = list(prop); alt[lo:hi + 1] = [k0] * (hi - lo + 1)
         rv.add('key-borrowed', 'high', rv.bars(range(lo, hi + 1)),
                f"These bars go to {KEY_NAME[k1]} and back to {KEY_NAME[k0]}, but {KEY_NAME[k0]}'s tonic is still often "
                f"in the bass: a real modulation, or borrowed chords around the same tonic (then keep {KEY_NAME[k0]} "
                f"and use accidentals)?",
-               "bass on the old tonic in at least 30% of the bars",
+               f"bass on the old tonic in at least {100 * ctx.cfg.key_borrowed_share:g}% of the bars",
                f"key signature set to {KEY_NAME[k1]}",
                [dict(label='modulation (keep)', edit=None),
                 dict(label=f'borrowed chords: stay in {KEY_NAME[k0]}', edit={'keys': key_changes(alt, ctx)})])
@@ -154,7 +156,11 @@ def harmony(ns, i, name):
 def auto_spelling(notes, ctx, rv, log):
     key_of = lambda n: ctx.keys[ctx.bar_of(n['on'])]
     margins = {}
-    prop = spellfit.propose(notes, key_of, margins=margins)
+    prop = spellfit.propose(notes, key_of, margins=margins,
+                           window=ctx.cfg.spelling_window, w_key=ctx.cfg.spelling_w_key,
+                           w_line=ctx.cfg.spelling_w_line, passes=ctx.cfg.spelling_passes,
+                           w_sound=ctx.cfg.spelling_w_sound, w_odd=ctx.cfg.spelling_w_odd,
+                           line_prev=ctx.cfg.spelling_line_prev)
     for n in notes:
         if id(n) in prop:
             n['spell'], n['spell_auto'] = prop[id(n)], True
@@ -164,7 +170,7 @@ def auto_spelling(notes, ctx, rv, log):
     groups = defaultdict(list)
     for i, n in enumerate(ns):
         gap, other = margins.get(id(n), (99.0, None))
-        if gap >= SPELL_MARGIN or other is None:
+        if gap >= ctx.cfg.spelling_review_margin or other is None:
             continue
         bass, snd, line = harmony(ns, i, name)
         groups[(name(n), acc(*other), bass, snd)].append((ctx.bar_of(n['on']), line, gap))

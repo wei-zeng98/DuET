@@ -153,7 +153,10 @@ def write(plan, ctx, path):
                 pieces = layout_voice(items, B, cut=pick, compound=cmp)
                 if pick:
                     pieces = [p for p in pieces if p['s'] >= pick]
-                beam(pieces, B, cmp)
+                num, den = bars.sig(m)
+                group_span = (F(3, 2) if num == 3 else F(1)) if den == 8 and not cmp else None
+                beam(pieces, B, cmp, group_span=group_span,
+                     beat_unit=F(1, 2) if den == 8 and not cmp else F(1))
                 laid.append(pieces)
             graces_in = grace_owners(laid, plan.grace_by, st)
             show_acc = accidentals(laid, graces_in, plan.grace_by, st, sp)

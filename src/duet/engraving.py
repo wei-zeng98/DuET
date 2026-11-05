@@ -1,6 +1,7 @@
 """Internal score and frame predictions consumed by readable engraving."""
 
 import tempfile
+from dataclasses import asdict
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -71,16 +72,18 @@ def predict_engraving_frames(model, data, device):
     return pd.DataFrame(table, columns=COLUMNS.split(","))
 
 
-def write_readable_musicxml(score, data, frames, path, *, title):
+def write_readable_musicxml(score, data, frames, path, *, title, cfg=None):
     """Publish only a complete readable XML; raw model arrays are copied first.
     The places the engraving was not sure about go next to it as review.json."""
     from .readable.inputs import Inputs
     from .readable.pipeline import run
 
+    from .readable.config import Config
+    cfg = Config.resolve(cfg)
     path = Path(path)
     inputs = Inputs.from_prediction(data, score, frames)
     with tempfile.TemporaryDirectory(prefix=".readable-", dir=path.parent) as temp:
-        xml, summary = run(inputs, temp, title=title)
+        xml, summary = run(inputs, temp, title=title, cfg=cfg)
         ET.parse(xml)
         review = Path(temp) / "score.review.json"
         if review.exists():
@@ -89,6 +92,7 @@ def write_readable_musicxml(score, data, frames, path, *, title):
     return {
         "version": __version__,
         "mode": "readable",
+        "config": asdict(cfg),
         "title": title,
         "summary": summary,
     }

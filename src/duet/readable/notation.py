@@ -145,12 +145,12 @@ def layout_voice(items, B, cut=None, compound=False, extra_cuts=()):
     return pieces
 
 
-def beam(pieces, B, compound=False):
+def beam(pieces, B, compound=False, *, group_span=None, beat_unit=F(1)):
     """8ths beamed per half bar (per beat in odd meters); groups containing
     16ths/32nds beamed per beat; triplets per tuplet region"""
     for pc in pieces:
         pc['beam'] = {}
-    span = F(3, 2) if compound else (2 if B % 2 == 0 else 1)
+    span = group_span if group_span is not None else (F(3, 2) if compound else (2 if B % 2 == 0 else 1))
 
     def win(pc):
         return ('t', pc['reg'][0]) if pc['reg'] else ('d', int(pc['s'] / span))
@@ -168,7 +168,7 @@ def beam(pieces, B, compound=False):
     for g in groups:
         if not compound and not g[0]['reg'] and any(type_of(p['d'], False)[0] != 'eighth' for p in g):
             sub = defaultdict(list)
-            for p in g: sub[int(p['s'])].append(p)
+            for p in g: sub[int(p['s'] / beat_unit)].append(p)
             out += [v for v in sub.values() if len(v) > 1]
         else:
             out.append(g)
