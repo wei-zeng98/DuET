@@ -3,6 +3,8 @@ from bisect import bisect_left
 from fractions import Fraction as F
 from collections import defaultdict
 
+from . import gliss
+
 
 def round_half(v):
     return F(max(1, round(v * 2)), 2)
@@ -70,6 +72,8 @@ def assign(notes, staff, ctx):
             if not restrike:
                 n['layer'] = 'B'
 
+    spans = getattr(ctx, 'gliss_spans', [])
+    gliss.split_layers(S, staff, spans)
     for L in ('A', 'B'):
         pool = [n for n in S if n['layer'] == L]
         ons = sorted(set(n['on'] for n in pool))
@@ -104,6 +108,7 @@ def assign(notes, staff, ctx):
                 d = int(e) - o
             for n in grp:
                 n['dur'] = d
+    gliss.restore_lengths(S, spans)
     for n in S:          # a B note must not swallow an A note of the same pitch
         if n['layer'] == 'B':
             for m in S:
