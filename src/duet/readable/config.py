@@ -122,6 +122,9 @@ class Config:
     a_tempo_ratio: float = 0.96
 
 
+    # ---- glissandi --------------------------------------------------------------
+    auto_glissandi: bool = True        # write fast runs on one scale as glissando lines (gliss.find)
+
     def __post_init__(self):
         for f in fields(self):
             value = getattr(self, f.name)

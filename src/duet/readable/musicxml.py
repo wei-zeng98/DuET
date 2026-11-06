@@ -4,6 +4,7 @@ from fractions import Fraction as F
 from xml.sax.saxutils import escape
 
 import numpy as np
+from . import gliss
 from .notation import layout_voice, beam, type_of
 from .spelling import Speller
 
@@ -225,6 +226,7 @@ def write(plan, ctx, path):
                         nt = ('<tied type="stop"/>' if tie_stop else '') + ('<tied type="start"/>' if tie_start else '')
                         if j == 0:
                             nt += tup_xml
+                        nt += gliss.notation(n, is_attack, last_piece and not pl['tie_out'])
                         if ev['roll'] and is_attack:
                             nt += '<arpeggiate/>'
                         if fermata and j == len(ev['notes']) - 1:
