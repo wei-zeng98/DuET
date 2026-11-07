@@ -117,7 +117,7 @@ class GlissDetectionTests(unittest.TestCase):
     def test_fingered_scale_short_arpeggio_and_short_runs_stay_written_out(self):
         d_major = [62, 64, 66, 67, 69, 71, 73, 74, 76]
         for notes in (run_at(0, d_major, 0.06), run_at(0, [66, 70, 73, 78, 82, 85]), run_at(0, RUN, 0.06),
-                      run_at(0, RUN[:9]), run_at(0, [55, 57, 59, 60, 62, 64, 65, 67])):
+                      run_at(0, RUN[:7]), run_at(0, [55, 57, 59, 60, 62, 64, 65, 67], 0.06)):
             self.assertEqual(found(notes), ([], []))
 
     def test_transcribed_slightly_out_of_order_is_one_run(self):

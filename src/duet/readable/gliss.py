@@ -188,7 +188,9 @@ def review_items(rv, ctx):
                f"{count} notes on {scale} keys from {first['pitch']} to {last['pitch']}, "
                f"played in {last['t'] - first['t']:.2f} s",
                f"{first['t']:.3f}:{first['pitch']} to {last['t']:.3f}:{last['pitch']} written as a glissando",
-               [dict(label='keep', edit=None), dict(label='write the notes: run with --no-auto-gliss', edit=None)])
+               [dict(label='keep', edit=None),
+                dict(label='write the notes (or --no-auto-gliss for every glissando)',
+                     edit={'gliss': [{'from': f"{first['t']:.3f}:{first['pitch']}", 'off': True}]})])
     for first, last, count, scale, played in getattr(ctx, 'gliss_scale_runs', []):
         bars = sorted({ctx.bar_of(first['on']), ctx.bar_of(last['on'])})
         mean = (played[-1][0] - played[0][0]) / (len(played) - 1) * 1000

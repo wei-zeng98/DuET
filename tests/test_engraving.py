@@ -84,7 +84,7 @@ class EngravingTests(unittest.TestCase):
             self.assertEqual(len(xml.findall("part")), 1)
             self.assertEqual(xml.findtext(".//staves"), "2")
             self.assertEqual(report["engraving"]["mode"], "readable")
-            self.assertEqual(report["engraving"]["version"], "1.1.0")
+            self.assertEqual(report["engraving"]["version"], "1.2.9")
             review = json.loads((output / "review.json").read_text(encoding="utf-8"))
             self.assertEqual(review["title"], "曲目 & test")
             self.assertIn("items", review)

@@ -11,6 +11,9 @@ more than hand_max_notes notes):
    its bass (with octave) becomes a grace note before the chord.
 """
 from collections import defaultdict
+from fractions import Fraction as F
+
+from .spelling import ledgers
 
 
 def playability(notes, ctx):
@@ -104,34 +107,59 @@ def playability(notes, ctx):
 
 
 def cross_over(notes, ctx):
-    """An LH attack lying above every RH note sounding at that moment (the LH
-    crosses over the RH) while the LH's bass is still held is written on the
-    RH staff when the RH can still reach it; on the LH staff it would force a
-    clef change under the tied bass notes."""
+    """LH attacks written on the RH staff:
+    - an attack above every RH note sounding then (the LH crosses over the RH)
+      while the LH's bass is still held, when the RH can reach it together with
+      its own notes: on the LH staff the clef change would cut through those ties;
+    - with cross_high, a passage too high for the bass clef in a bar whose LH
+      also has a bass (below D3): attacks needing local_clef_min_ledgers ledger
+      lines, together with the LH attacks within half a beat of them needing one
+      fewer (the rest of the same figure), unless one doubles a RH attack. On the
+      LH staff they would force a clef change in the middle of the bar, squeezed
+      between the notes; on the RH staff they are still played by the LH."""
     cfg = ctx.cfg
     rh = [n for n in notes if n['staff'] == 0 and not n['grace']]
     lh_at = defaultdict(list)
     for n in notes:
         if n['staff'] == 1 and not n['grace']:
             lh_at[n['on']].append(n)
+    lh_bar = defaultdict(list)
+    for t, grp in lh_at.items():
+        lh_bar[ctx.bar_of(t)] += [n['pitch'] for n in grp]
+    led = {t: max(ledgers(n['pitch'], 'F') for n in grp) for t, grp in lh_at.items()}
+    lows = {t: min(n['pitch'] for n in grp) for t, grp in lh_at.items()}
+    high = set()
+    if cfg.cross_high:
+        high = {t for t in lh_at if lows[t] >= cfg.cross_over_min and led[t] >= cfg.local_clef_min_ledgers
+                and min(lh_bar[ctx.bar_of(t)]) < 50}
+        grow = True
+        while grow:                      # the rest of the figure: neighbours one ledger lower
+            grow = False
+            for t in lh_at:
+                if t not in high and lows[t] >= cfg.cross_over_min and led[t] >= cfg.local_clef_min_ledgers - 1 \
+                        and any(abs(t - h) <= F(1, 2) and ctx.bar_of(h) == ctx.bar_of(t) for h in high):
+                    high.add(t); grow = True
     moved = 0
     for t, grp in sorted(lh_at.items()):
-        lo = min(n['pitch'] for n in grp)
+        lo = lows[t]
         if lo < cfg.cross_over_min:
             continue
-        # only while the LH's own bass is still held from before: on the LH staff the
-        # clef change would cut through those ties (plain hand crossings stay on the LH staff)
         held = [n for g in lh_at.values() for n in g if n['on'] < t < n['on'] + n['dur'] and n['pitch'] < lo - 12]
-        if not held:
-            continue
-        sounding = [n['pitch'] for n in rh if n['on'] <= t < n['on'] + n['dur']]
-        if not sounding or lo <= max(sounding):
-            continue
-        chord = [n['pitch'] for n in rh if n['on'] == t] + [n['pitch'] for n in grp]
-        if max(chord) - min(chord) > cfg.hand_span or len(chord) > cfg.hand_max_notes:
-            continue
+        if t in high:
+            # written in its own voice on the RH staff: it only must not double a RH attack
+            if any(n['pitch'] == r['pitch'] and r['on'] == t for n in grp for r in rh):
+                continue
+        else:
+            sounding = [n['pitch'] for n in rh if n['on'] <= t < n['on'] + n['dur']]
+            if not held or not sounding or lo <= max(sounding):
+                continue
+            # the RH takes these notes over: it must reach them with its own
+            chord = [n['pitch'] for n in rh if n['on'] == t] + [n['pitch'] for n in grp]
+            if max(chord) - min(chord) > cfg.hand_span or len(chord) > cfg.hand_max_notes:
+                continue
         for n in grp:
             n['staff'] = 0; n['crossed'] = True
         moved += len(grp)
-        ctx.log(f"LH above RH -> RH staff {sorted(n['pitch'] for n in grp)} ({ctx.where(t)})")
+        ctx.log(f"LH {'too high for the bass clef' if t in high else 'above RH'} -> RH staff "
+                f"{sorted(n['pitch'] for n in grp)} ({ctx.where(t)})")
     return moved
