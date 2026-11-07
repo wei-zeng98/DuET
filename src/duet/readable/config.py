@@ -123,7 +123,16 @@ class Config:
 
 
     # ---- glissandi --------------------------------------------------------------
-    auto_glissandi: bool = True        # write fast runs on one scale as glissando lines (gliss.find)
+    auto_gliss: bool = True            # write glissandi (fast runs on one key colour) as glissando lines (gliss.find)
+    gliss_min_notes: int = 10          # notes of one key colour in a row, one direction
+    gliss_min_span: int = 24           # semitones (two octaves: shorter fast runs stay written out)
+    gliss_gap: float = 0.07            # s between two notes of the run at most (one missed key allowed)
+    gliss_mean_gap: float = 0.045      # s between notes on average at most
+    gliss_disorder: float = 0.02       # s a note may be transcribed before the previous one
+    gliss_coverage: float = 0.7        # share of the keys in the range the run must play
+    scale_run_min_notes: int = 8       # review only: fast runs on a major scale (glissando or fingered?)
+    scale_run_min_span: int = 12
+    scale_run_mean_gap: float = 0.045  # as fast as a glissando: fingered scales run at 50-70 ms a note
 
     def __post_init__(self):
         for f in fields(self):

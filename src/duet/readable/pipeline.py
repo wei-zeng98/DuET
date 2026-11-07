@@ -206,11 +206,11 @@ def _run(inp, out_dir, title=None, cfg=None):
     # bring two notes of one pitch together
     sanitize(notes, ctx)
     notes = dedupe(notes, ctx)
-    runs = []
-    if cfg.auto_glissandi:
-        runs, rejected = gliss.find(inp.perf, float(np.median(np.diff(G))) if len(G) > 1 else 0.5)
-        log(f"gliss: detected {len(runs)} runs, rejected {rejected} as repeated chords")
-    gliss.apply(notes, runs, ctx)
+    runs, scale_runs = [], []
+    if cfg.auto_gliss:
+        runs, scale_runs = gliss.find(inp.perf, cfg)
+        log(f"gliss: detected {len(runs)} glissandi, {len(scale_runs)} fast major-scale runs left written out")
+    gliss.apply(notes, runs, ctx, scale_runs)
     last_on = max(n['on'] for n in notes)
     if model_bars is None:
         ctx.nbars = int(last_on // B) + 1

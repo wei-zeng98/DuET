@@ -51,8 +51,8 @@ def main():
     for name in ('keys', 'spelling', 'runs'):
         parser.add_argument('--auto-' + name, action=argparse.BooleanOptionalAction,
                             default=None, help="Override automatic " + name + " (default: enabled)")
-    parser.add_argument('--auto-glissandi', action=argparse.BooleanOptionalAction, default=None,
-                        help='Write fast runs on one scale as glissando lines (default: enabled)')
+    parser.add_argument('--auto-gliss', action=argparse.BooleanOptionalAction, default=None,
+                        help='Write glissandi as glissando lines (default: enabled)')
     parser.add_argument('--key-switch', type=float, help="Penalty for a key-signature change")
     parser.add_argument('--key-model-cost', type=float, help="Penalty per note for disagreeing with model keys")
     args = parser.parse_args()
@@ -61,7 +61,7 @@ def main():
         engraving = json.loads(args.engraving_config.read_text(encoding='utf-8')) if args.engraving_config else {}
         if not isinstance(engraving, dict):
             raise ValueError("Engraving configuration must be a JSON object")
-        for name in ('auto_keys', 'auto_spelling', 'auto_runs', 'auto_glissandi', 'key_switch', 'key_model_cost'):
+        for name in ('auto_keys', 'auto_spelling', 'auto_runs', 'auto_gliss', 'key_switch', 'key_model_cost'):
             value = getattr(args, name)
             if value is not None:
                 engraving[name] = value

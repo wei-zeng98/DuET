@@ -25,7 +25,8 @@ for each answer, so a reviewer (the engrave-polish skill) only decides. Items:
   free-run      more notes in a beat than the run's subdivision holds (tuplet?)
   displaced     a note written away from where it was played while its
                 neighbours are on time
-  glissando     a fast run written as a glissando line (with --auto-glissandi)
+  glissando     a glissando written as a glissando line (with --auto-gliss)
+  scale-run     a fast run on a major scale: written out, or a glissando?
 """
 import json
 from collections import defaultdict

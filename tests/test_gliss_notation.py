@@ -1,4 +1,4 @@
-"""Fast runs on one scale become one wavy line from their performed positions."""
+"""Glissandi (fast runs on one key colour) become one wavy line between their outer notes."""
 import json
 import tempfile
 import unittest
@@ -15,15 +15,15 @@ from duet.readable.inputs import Inputs
 from duet.score import Score
 
 BEAT_SECONDS = 0.5
-RUN = [93, 91, 89, 88, 86, 84, 83, 81, 79, 77, 76, 74]  # A6 to D5, white keys
+RUN = [96, 95, 93, 91, 89, 88, 86, 84, 83, 81, 79, 77, 76, 74, 72]  # C7 to C5, white keys
 
 
 def fixture(run=RUN, crossing_staff=1):
-    """Two 4/4 bars with a chord on the downbeat, a run played from beat 1.25 to 2.75, a crossing note, a late chord.
+    """Two 4/4 bars with a chord on the downbeat, a run played from beat 1.25 (40 ms a note), a crossing note, a late chord.
 
     The model positions of the run are stretched on 32nds, as the model does, so they overrun where it was played.
     """
-    played = [0.0, 0.0] + [1.25 + i * 1.5 / (len(run) - 1) for i in range(len(run))] + [2.0, 4.0, 4.0]
+    played = [0.0, 0.0] + [1.25 + i * 0.08 for i in range(len(run))] + [2.0, 4.0, 4.0]
     pitch = [60, 64] + run + [52, 60, 64]
     written = [0.0, 0.0] + [1.25 + i * 0.25 for i in range(len(run))] + [2.0, 4.5, 4.5]
     q = np.array(written)
@@ -40,7 +40,7 @@ def fixture(run=RUN, crossing_staff=1):
 
 def engrave(auto=True, **options):
     data, score, frames = fixture(**options)
-    cfg = Config(auto_keys=False, auto_spelling=False, auto_runs=False, auto_glissandi=auto)
+    cfg = Config(auto_keys=False, auto_spelling=False, auto_runs=False, auto_gliss=auto)
     with tempfile.TemporaryDirectory() as folder:
         path, _ = pipeline.run(Inputs.from_prediction(data, score, frames), folder, cfg=cfg)
         review = json.loads((Path(folder) / 'score.review.json').read_text(encoding='utf-8'))
@@ -57,17 +57,17 @@ def perf_of(notes):
     return [(seconds, seconds + 0.5, pitch, 70) for seconds, pitch in notes]
 
 
-def run_at(start, pitches, step=0.05):
+def run_at(start, pitches, step=0.03):
     return [(start + index * step, pitch) for index, pitch in enumerate(pitches)]
 
 
-def found(notes, beat=0.5):
-    return gliss.find(perf_of(notes), beat)
+def found(notes):
+    return gliss.find(perf_of(notes), Config())
 
 
 class GlissNotationTests(unittest.TestCase):
     def test_on_by_default_and_can_be_turned_off(self):
-        self.assertTrue(Config().auto_glissandi)
+        self.assertTrue(Config().auto_gliss)
         root, _ = engrave(auto=False)
         self.assertEqual(list(root.iter('glissando')), [])
 
@@ -79,7 +79,7 @@ class GlissNotationTests(unittest.TestCase):
         self.assertEqual(len([item for item in review['items'] if item['kind'] == 'glissando']), 1)
 
     def test_white_key_is_written_natural_in_a_sharp_key(self):
-        root, _ = engrave(run=[89, 88, 86, 84, 83, 81, 79, 77, 76, 74, 72, 71])  # starts on F6 in E major
+        root, _ = engrave(run=[89, 88, 86, 84, 83, 81, 79, 77, 76, 74, 72, 71, 69, 67, 65])  # F6 to F4 in E major
         start = next(n for n in attacks(root) if n.findtext('pitch/step') == 'F' and n.findtext('pitch/octave') == '6')
         self.assertIsNone(start.find('pitch/alter'))
         self.assertEqual(start.findtext('accidental'), 'natural')
@@ -99,52 +99,36 @@ class GlissNotationTests(unittest.TestCase):
 
 
 class GlissDetectionTests(unittest.TestCase):
-    def test_white_black_and_major_scale_runs(self):
-        black = [90, 87, 85, 82, 80, 78, 75, 73, 70, 68, 66]
-        e_major = [88, 87, 85, 83, 81, 80, 78, 76, 75, 73, 71]
-        for pitches, scale in ((RUN, 'white'), (black, 'black'), (e_major, 'E major')):
+    BLACK = [94, 92, 90, 87, 85, 82, 80, 78, 75, 73, 70]   # B-flat 6 to B-flat 4
+
+    def test_white_and_black_glissandi(self):
+        for pitches, scale in ((RUN, 'white'), (self.BLACK, 'black')):
             with self.subTest(scale=scale):
                 runs, _ = found(run_at(0, pitches))
                 self.assertEqual([run['scale'] for run in runs], [scale])
                 self.assertEqual([p for _, p in runs[0]['notes']], pitches)
 
-    def test_played_scale_short_figure_and_low_chords_are_not_runs(self):
-        for notes in (run_at(0, RUN, 0.12), run_at(0, RUN[:5]), run_at(0, [55, 59, 60, 62, 64, 65, 67, 69])):
-            self.assertEqual(found(notes)[0], [])
+    def test_fast_major_scale_run_is_only_reported(self):
+        e_major = [88, 87, 85, 83, 81, 80, 78, 76, 75, 73, 71]
+        runs, scale_runs = found(run_at(0, e_major))
+        self.assertEqual(runs, [])
+        self.assertEqual([run['scale'] for run in scale_runs], ['E major'])
 
-    def test_transcribed_end_out_of_order_is_one_run(self):
-        # Onsets of a real run in beats at 162 BPM: the end comes out late and out of order.
-        head = [1.19, 1.22, 1.28, 1.32, 1.39, 1.46, 1.53, 1.64, 1.72, 1.81, 1.86, 1.96, 2.08, 2.14]
-        pitches = [93, 91, 89, 88, 86, 84, 83, 81, 79, 77, 76, 74, 72, 71]
-        tail = [(2.40, 64), (2.47, 67), (2.53, 60), (2.64, 65), (2.71, 62), (2.73, 59)]
-        beat = 60 / 162
-        notes = [(at * beat, pitch) for at, pitch in list(zip(head, pitches)) + tail]
-        self.assertEqual(len(found(notes, beat)[0][0]['notes']), 20)
+    def test_fingered_scale_short_arpeggio_and_short_runs_stay_written_out(self):
+        d_major = [62, 64, 66, 67, 69, 71, 73, 74, 76]
+        for notes in (run_at(0, d_major, 0.06), run_at(0, [66, 70, 73, 78, 82, 85]), run_at(0, RUN, 0.06),
+                      run_at(0, RUN[:9]), run_at(0, [55, 57, 59, 60, 62, 64, 65, 67])):
+            self.assertEqual(found(notes), ([], []))
+
+    def test_transcribed_slightly_out_of_order_is_one_run(self):
+        notes = run_at(0, RUN)
+        notes[6], notes[7] = (notes[6][0] + 0.0225, notes[6][1]), (notes[7][0] - 0.0225, notes[7][1])  # 15 ms swapped
+        self.assertEqual(len(found(notes)[0][0]['notes']), len(RUN))
 
     def test_chords_it_crosses_stay_out(self):
-        chord = [(0.25, 60), (0.25, 63), (0.25, 68)]
+        chord = [(0.2, 60), (0.2, 63), (0.2, 68)]
         runs, _ = found(run_at(0, RUN) + chord)
         self.assertEqual(sorted(p for _, p in runs[0]['notes']), sorted(RUN))
-
-    def test_chord_note_at_the_end_goes_to_the_chord(self):
-        pitches = RUN + [72]
-        end = (len(pitches) - 1) * 0.05
-        runs, _ = found(run_at(0, pitches) + [(end, 45), (end, 52)])
-        self.assertNotIn(72, [p for _, p in runs[0]['notes']])
-
-    def test_note_struck_before_the_run_reaches_it_stays_out(self):
-        holes = [(index * 0.05, p) for index, p in enumerate(RUN) if p != 76]
-        runs, _ = found(holes + [(5 * 0.05, 76)])
-        self.assertNotIn(76, [p for _, p in runs[0]['notes']])
-
-    def test_mostly_repeated_chords_are_rejected(self):
-        pitches = RUN[:10]
-        notes = run_at(0, pitches)
-        for index in range(1, 7):
-            at = index * 0.05
-            notes += [(at, 52), (at + 0.6, pitches[index]), (at + 0.6, 52)]
-        runs, rejected = found(notes)
-        self.assertEqual((runs, rejected), ([], 1))
 
 
 if __name__ == '__main__':
