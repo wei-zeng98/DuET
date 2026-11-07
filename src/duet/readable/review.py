@@ -31,7 +31,7 @@ for each answer, so a reviewer (the engrave-polish skill) only decides. Items:
   duple         a figure written as triplets / sextuplets that reads better as
                 16ths or 32nds and was played about as close to that (per figure)
   parallel      a bar with the same notes as other bars but another rhythm
-  inner-voice   a lone low RH note that completes an LH chord
+  inner-voice   a lone low RH note that completes an LH chord of two notes or more
   odd-beat      beats with 5 or 7 notes played about evenly: one 5:4 / 7:4 tuplet each
   scale-run     a fast run on a major scale: written out, or a glissando? (engrave.gliss)
 
@@ -492,17 +492,26 @@ def parallel_bars(notes, ctx, rv):
 
 
 def inner_voice(notes, ctx, rv):
-    """a lone RH note below middle C struck together with LH notes it could join
-    (within an octave above the LH's lowest note there): probably part of the LH chord"""
+    """a lone RH note below middle C struck together with an LH chord (two notes or
+    more) it completes (above the LH's top, within an octave of its lowest note):
+    probably part of the LH chord. Left out when the RH plays below middle C
+    within a beat before or after it (other than such notes): then the RH itself
+    has a figure in that register"""
     at = defaultdict(lambda: ([], []))
     for n in notes:
         if not n['grace'] and not n.get('tuplet_member'):
             at[n['on']][n['staff']].append(n)
-    by_bar = defaultdict(list)
+    cand = []
     for on, (rh, lh) in at.items():
-        if len(rh) == 1 and rh[0]['pitch'] < 60 and lh and rh[0]['pitch'] - min(n['pitch'] for n in lh) <= 12 \
+        if len(rh) == 1 and rh[0]['pitch'] < 60 and len(lh) >= 2 and rh[0]['pitch'] - min(n['pitch'] for n in lh) <= 12 \
                 and rh[0]['pitch'] > max(n['pitch'] for n in lh):
-            by_bar[ctx.bar_of(on)].append(rh[0])
+            cand.append(rh[0])
+    ids = {id(n) for n in cand}
+    low_rh = [n for on, (rh, _) in at.items() for n in rh if n['pitch'] < 60 and id(n) not in ids]
+    by_bar = defaultdict(list)
+    for n in cand:
+        if not any(0 < abs(m['on'] - n['on']) <= 1 for m in low_rh):
+            by_bar[ctx.bar_of(n['on'])].append(n)
     for m, ns in sorted(by_bar.items()):
         names = ' '.join(f"{acc(*Speller(ctx.keys[m]).spell(n)[:2])}{n['pitch'] // 12 - 1}" for n in ns)
         rv.add('inner-voice', 'low', rv.bars([m]),

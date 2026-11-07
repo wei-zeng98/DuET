@@ -146,6 +146,18 @@ def events_for(layers, staff, layer):
     return ev
 
 
+def brief_slowdown(bpm, m, mark, cfg):
+    """bar m slows down but the tempo is back (above a_tempo_ratio of the mark) within
+    rit_min_bars bars: a phrase end breathing, which gets no rit. / a tempo pair"""
+    return any(j < len(bpm) and bpm[j] / mark > cfg.a_tempo_ratio for j in range(m + 1, m + cfg.rit_min_bars))
+
+
+def grace_order(n):
+    """graces before one note: bass graces (written as a chord) by pitch, the others
+    in playing order"""
+    return (0, n['pitch']) if n.get('bass_grace') else (1, n['t'], n['pitch'])
+
+
 def staff_events(plan, staff):
     out = []
     for (st, _), evs in plan.EV.items():
@@ -318,8 +330,7 @@ def directions(plan, inp, G, ctx):
         r = bpm[m] / mark
         # a slow-down of fewer than rit_min_bars bars (a phrase end breathing) gets no
         # "rit." / "a tempo" pair: playback still follows it; the closing bars always do
-        brief = m < close_from and any(j < NB and bpm[j] / mark > cfg.a_tempo_ratio
-                                       for j in range(m + 1, m + cfg.rit_min_bars))
+        brief = m < close_from and brief_slowdown(bpm, m, mark, cfg)
         if not slow and r < cfg.rit_ratio and brief:
             ctx.log(f"tempo: bar {m + (0 if ctx.pickup else 1)} slows to {r:.2f} for less than {cfg.rit_min_bars} bars: no rit.")
         elif not slow and r < cfg.rit_ratio:

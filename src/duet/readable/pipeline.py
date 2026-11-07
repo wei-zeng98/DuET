@@ -14,7 +14,7 @@ from .context import Ctx, Bars
 from .grid import build_grid, fix_rewinds
 from .hands import playability, cross_over
 from .meter import analyse as analyse_meter
-from .layout import Plan, lh_clefs, local_clefs, clef_timeline, events_for, ottava_runs, ottava_bassa_runs, directions
+from .layout import Plan, lh_clefs, local_clefs, clef_timeline, events_for, ottava_runs, ottava_bassa_runs, directions, grace_order
 from .musicxml import write
 from .quantize import quantize
 from .spelling import ledgers, set_key
@@ -286,7 +286,7 @@ def _run(inp, out_dir, title=None, cfg=None):
     for g in plan.graces:
         plan.grace_by[(g['staff'], g['on'])].append(g)
     for k in plan.grace_by:
-        plan.grace_by[k].sort(key=lambda n: (0, n['pitch']) if n.get('bass_grace') else (1, n['t'], n['pitch']))  # bass graces as a chord, others in playing order
+        plan.grace_by[k].sort(key=grace_order)
     plan.ott = {0: ottava_runs(plan, 0, *cfg.ottava_rh, ctx), 1: ottava_runs(plan, 1, *cfg.ottava_lh, ctx)}
     plan.ott_bassa = ottava_bassa_runs(plan, ctx)
     plan.dirs = directions(plan, inp, G, ctx)
