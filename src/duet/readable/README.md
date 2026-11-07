@@ -42,6 +42,19 @@ stored in `report.json` under `engraving.config`. Python callers can pass a Conf
 or dictionary through `transcribe(..., engraving_config=...)` and
 `transcribe_audio(..., engraving_config=...)`.
 
+## Glissandi
+
+The model writes a glissando as a crowded run of 32nds that overruns the bar. By default DuET finds glissandi in the
+performance and writes each as a wavy line from its first note to its last: at least 10 notes on one key colour (white
+or black keys) in one direction, spanning two octaves or more, about 22 notes a second or faster. The first note keeps
+its position and lasts until the last one, which goes where it was played; each stays on its own staff, so a line can
+cross from one hand to the other. Only the run's own notes are removed; notes of the other hand struck during the line
+go back to where they were played, in the second voice. White-key glissandi are spelled with white keys.
+
+Each glissando is a `glissando` item in `review.json`, because a wrong detection takes notes off the page. Fast runs on
+a major scale are only listed (`scale-run` items): fingered scales that fast are far more common than scale glissandi.
+`--no-auto-gliss` turns this off; the thresholds are the `gliss_*` settings of the engraving configuration.
+
 All score times remain in quarter notes, including 3/8 (3/2 quarters), 4/8 (2),
 and 9/8 (9/2). Simple eighth meters use an eighth-note grid unit; compound eighth
 meters use dotted-quarter pulses. Bar durations, not integer casts, control the

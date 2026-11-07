@@ -7,6 +7,7 @@ from fractions import Fraction as F
 
 import numpy as np
 
+from . import gliss
 from . import review as review_mod
 from .config import Config
 from .context import Ctx, Bars
@@ -205,6 +206,11 @@ def _run(inp, out_dir, title=None, cfg=None):
     # bring two notes of one pitch together
     sanitize(notes, ctx)
     notes = dedupe(notes, ctx)
+    runs, scale_runs = [], []
+    if cfg.auto_gliss:
+        runs, scale_runs = gliss.find(inp.perf, cfg)
+        log(f"gliss: detected {len(runs)} glissandi, {len(scale_runs)} fast major-scale runs left written out")
+    gliss.apply(notes, runs, ctx, scale_runs)
     last_on = max(n['on'] for n in notes)
     if model_bars is None:
         ctx.nbars = int(last_on // B) + 1
@@ -223,6 +229,7 @@ def _run(inp, out_dir, title=None, cfg=None):
     ctx.keys = [keys_model[min(max(int(np.searchsorted(starts, old_pos(m), 'right')) - 1, 0), len(keys_model) - 1)]
                 for m in range(ctx.nbars)]
     rv = review_mod.Review(ctx)
+    gliss.review_items(rv, ctx)
     if cfg.auto_keys:
         review_mod.auto_keys(notes, ctx, rv, log)
     if cfg.auto_runs:
@@ -235,6 +242,7 @@ def _run(inp, out_dir, title=None, cfg=None):
 
     notes, stats = playability(notes, ctx)
     stats['cross_over'] = cross_over(notes, ctx)
+    gliss.finish(notes)
     log(f"playability: {stats}")
     layers = {st: assign(notes, st, ctx) for st in (0, 1)}
 
