@@ -15,6 +15,10 @@ class Config:
     beat_refine_window: float = 0.06   # s; snap a beat time to the median of onsets this close
     beat_phase_tol: float = 0.25       # beats; a frame beat further than this from a model beat is off-beat
     phase_window_bars: int = 8         # window (bars) for downbeat evidence after a gap / diagnostics
+    half_bar_shift: bool = True        # move all bar lines half a bar when the frame downbeats say so (uniform meter)
+    half_bar_min_downbeats: int = 8    # at least this many confident frame downbeats
+    half_bar_share: float = 0.7        # share of them half a bar from the model's bar lines
+    half_bar_max_on_bar: float = 0.15  # and at most this share on the model's bar lines
     snap_bar_lines: bool = True       # propose half-quarter bar-line snapping, roll back if topology changes
     grid_count_fix: bool = True        # let frame evidence change the model's beat count in gaps
     rewind_min: float = 1.5            # beats the model numbering must jump back to count as a rewind

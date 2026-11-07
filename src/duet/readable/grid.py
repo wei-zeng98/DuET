@@ -470,6 +470,9 @@ def _build_grid(frames, onsets, q, B, cfg, log, bars=None):
     ph = np.round(pos) % B
     on_bar = np.mean(ph == 0) if strong.any() else float('nan')
     log(f"grid: {strong.sum()} confident frame downbeats, {on_bar * 100:.0f}% fall on bar lines")
+    # whole-piece vote for pipeline.half_bar_shift: (confident downbeats, share on bar lines, share half a bar off)
+    shift_at.half_vote = (int(strong.sum()), float(np.mean(ph == 0)) if strong.any() else 0.0,
+                          float(np.mean(ph == B // 2)) if strong.any() and B % 2 == 0 else 0.0)
     W = cfg.phase_window_bars
     bars = (np.round(pos) // B).astype(int)
     half = B // 2 if B % 2 == 0 else None
@@ -483,6 +486,6 @@ def _build_grid(frames, onsets, q, B, cfg, log, bars=None):
                 f"phases {np.bincount(ph[sel].astype(int), minlength=B).tolist()} (likely a miscounted beat; check)")
         elif on_half > on_bar:
             log(f"note grid: bar index {b0}-{b0 + W - 1}: frame downbeats sit half a bar from the bar lines "
-                f"(half-bar ambiguity; kept the model's bar lines)")
+                f"(half-bar ambiguity; see half_bar_shift)")
     shift_at.free = in_free_zone
     return G, shift_at

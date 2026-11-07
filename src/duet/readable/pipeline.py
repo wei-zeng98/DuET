@@ -193,6 +193,16 @@ def _run(inp, out_dir, title=None, cfg=None):
     grid_bars = None if model_bars is None else (
         np.array([b[0] for b in model_bars]), np.array([b[3] for b in model_bars]))
     G, shift_at = build_grid(inp.frames, on, z['notes'][:, 1], B, cfg, log, pulse=ctx.pulse, bars=grid_bars)
+    vote = getattr(shift_at, 'half_vote', None)
+    half_shift = 0.0
+    if (cfg.half_bar_shift and model_bars is None and vote and vote[0] >= cfg.half_bar_min_downbeats
+            and vote[2] >= cfg.half_bar_share and vote[1] <= cfg.half_bar_max_on_bar):
+        # the frame head puts the downbeats half a bar from the model's bar lines all through the piece
+        half_shift = float(B) / 2
+        z['notes'][:, 1] = z['notes'][:, 1] + half_shift
+        log(f"grid: bar lines moved half a bar: {vote[0]} confident frame downbeats, {vote[2] * 100:.0f}% half a bar "
+            f"from the model's bar lines, {vote[1] * 100:.0f}% on them")
+        G, shift_at = build_grid(inp.frames, on, z['notes'][:, 1], B, cfg, lambda s: None, pulse=ctx.pulse, bars=None)
     first_q = min(float(z['notes'][i, 1]) + shift_at(on[i]) for i in range(len(on)))
     lead = F(int(first_q / float(ctx.pulse))) * ctx.pulse           # whole felt beats before the first note
     ctx.pickup = lead if 0 < lead < B else F(0)
@@ -215,6 +225,11 @@ def _run(inp, out_dir, title=None, cfg=None):
     if model_bars is None:
         ctx.nbars = int(last_on // B) + 1
         ctx.bars = Bars.uniform(ctx.nbars, ctx.num, ctx.beat_type)
+        last_end = max(n['on'] + n['dur'] for n in notes)
+        rest = B - ctx.pickup
+        if half_shift and ctx.pickup and last_end <= ctx.bars.start(ctx.nbars - 1) + rest:
+            # bar lines moved by half a bar: the last bar completes the pickup
+            ctx.bars = Bars(ctx.bars.starts, ctx.bars.sigs, [B] * (ctx.nbars - 1) + [rest])
     else:
         ctx.bars = map_model_bars(model_bars, z['notes'][:, 1], on, shift_at, last_on, ctx)
         ctx.nbars = ctx.bars.n
@@ -224,7 +239,7 @@ def _run(inp, out_dir, title=None, cfg=None):
         ctx.pickup = lead if 0 < lead < ctx.bars.length(0) else F(0)
     keys_model = [int(k) for k in z.get('keys', [0])]
     starts = np.asarray(z.get('bar_starts', np.arange(len(keys_model)) * float(B)), float)
-    old_pos = (lambda m: to_old(float(ctx.bars.start(m)) + 1e-6)) if model_bars is None else \
+    old_pos = (lambda m: to_old(float(ctx.bars.start(m)) - half_shift + 1e-6)) if model_bars is None else \
         (lambda m: model_bars[min(m, len(model_bars) - 1)][0] + 1e-6)
     ctx.keys = [keys_model[min(max(int(np.searchsorted(starts, old_pos(m), 'right')) - 1, 0), len(keys_model) - 1)]
                 for m in range(ctx.nbars)]
