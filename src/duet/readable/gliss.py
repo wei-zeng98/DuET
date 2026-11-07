@@ -137,12 +137,16 @@ def apply(notes, runs, ctx, scale_runs=()):
         end = snap(last['x'])
         if last_end is not None and start <= last_end:
             start = last_end + POSITION_GRID
+        nearest = end
+        end, room = _before_next(notes, found, last, start, end)
+        if end != nearest:
+            ctx.log(f"gliss: run {number} end moved from {ctx.where(nearest)} to {ctx.where(end)}, before the next note")
         if end <= start:
             end = start + POSITION_GRID
         last_end = end
         line = (number - 1) % 6 + 1
         first.update(on=start, dur=end - start)
-        last.update(on=end, dur=max(END_NOTE, snap(last['dur'])))
+        last.update(on=end, dur=min(max(END_NOTE, snap(last['dur'])), room) if room else max(END_NOTE, snap(last['dur'])))
         for note, kind in ((first, 'start'), (last, 'stop')):
             note.update(grace=False, bass_grace=False, roll=False, gliss=kind, gliss_staff=note['staff'],
                         gliss_scale=run['scale'], gliss_number=line)
@@ -158,6 +162,27 @@ def apply(notes, runs, ctx, scale_runs=()):
             ctx.gliss_scale_runs.append((found[0], found[-1], len(found), run['scale'], run['notes']))
     replace_crossing_notes(notes, ctx)
     return notes
+
+
+def _before_next(notes, found, last, start, end):
+    """The last note goes before the next note played after it on its staff.
+
+    Rounding to the nearest 16th can put it on that note's onset: from audio, the run in test2 m16 ended 0.08 beat
+    before the downbeat and was written as a chord with the downbeat's E. It then goes on the last 8th before that
+    note (the last 16th when no 8th is left after the start). Returns (end, room before the next note or None)."""
+    members = {id(n) for n in found}
+    later = [n['on'] for n in notes if id(n) not in members and n['staff'] == last['staff'] and not n['grace']
+             and n['t'] > last['t']]
+    if not later:
+        return end, None
+    following = min(later)
+    if end < following:
+        return end, following - end
+    for step in (F(1, 2), POSITION_GRID):
+        candidate = (following - POSITION_GRID) // step * step
+        if start < candidate < following:
+            return candidate, following - candidate
+    return end, None
 
 
 def replace_crossing_notes(notes, ctx):
