@@ -146,8 +146,31 @@ def events_for(layers, staff, layer):
     return ev
 
 
+def brief_slowdown(bpm, m, mark, cfg):
+    """bar m slows down but the tempo is back (above a_tempo_ratio of the mark) within
+    rit_min_bars bars: a phrase end breathing, which gets no rit. / a tempo pair"""
+    return any(j < len(bpm) and bpm[j] / mark > cfg.a_tempo_ratio for j in range(m + 1, m + cfg.rit_min_bars))
+
+
+def grace_order(n):
+    """graces before one note: bass graces (written as a chord) by pitch, the others
+    in playing order"""
+    return (0, n['pitch']) if n.get('bass_grace') else (1, n['t'], n['pitch'])
+
+
 def staff_events(plan, staff):
-    return [e for (st, _), evs in plan.EV.items() if st == staff for e in evs]
+    out = []
+    for (st, _), evs in plan.EV.items():
+        if st != staff:
+            continue
+        for e in evs:
+            g = e.get('tuplet')
+            if g:           # a free tuplet (edits): its notes one by one, at their places
+                out += [dict(on=e['on'] + i * g['unit'], end=e['on'] + (i + 1) * g['unit'], notes=ns)
+                        for i, ns in enumerate(g['events'])]
+            else:
+                out.append(e)
+    return out
 
 
 def ottava_runs(plan, staff, lo_min, need_max, ctx):
@@ -166,7 +189,20 @@ def ottava_runs(plan, staff, lo_min, need_max, ctx):
         tops = [max(n['pitch'] for n in e['notes']) for e in r]
         if sum(t >= need_max for t in tops) >= 2 or max(tops) >= need_max + 3:
             out.append((r[0]['on'], max(e['end'] for e in r)))
-    return out
+    return [r for r in (outside_tuplets(plan, staff, a, b) for a, b in out) if r[0] < r[1]]
+
+
+def outside_tuplets(plan, staff, a, b):
+    """an 8va line starts and stops at a free tuplet's edge, never inside it (a
+    direction inside the tuplet would apply from its start in MuseScore)"""
+    for (st, _), evs in plan.EV.items():
+        for e in evs:
+            if st == staff and e.get('tuplet'):
+                if e['on'] < a < e['end']:
+                    a = e['end']
+                if e['on'] < b < e['end']:
+                    b = e['on']
+    return a, b
 
 
 def ottava_bassa_runs(plan, ctx):
@@ -292,7 +328,12 @@ def directions(plan, inp, G, ctx):
             D.add(bars.start(m), 1, '<words/>', '', f'<sound tempo="{tb}"/>', order=3)
             last = tb
         r = bpm[m] / mark
-        if not slow and r < cfg.rit_ratio:
+        # a slow-down of fewer than rit_min_bars bars (a phrase end breathing) gets no
+        # "rit." / "a tempo" pair: playback still follows it; the closing bars always do
+        brief = m < close_from and brief_slowdown(bpm, m, mark, cfg)
+        if not slow and r < cfg.rit_ratio and brief:
+            ctx.log(f"tempo: bar {m + (0 if ctx.pickup else 1)} slows to {r:.2f} for less than {cfg.rit_min_bars} bars: no rit.")
+        elif not slow and r < cfg.rit_ratio:
             D.add(bars.start(m), 1, '<words font-style="italic">rit.</words>', ' placement="above"', order=3); slow = True
         elif slow and r > cfg.a_tempo_ratio:
             D.add(bars.start(m), 1, '<words font-style="italic">a tempo</words>', ' placement="above"', order=3); slow = False

@@ -72,7 +72,8 @@ def duple_split(p, L, B, compound=False):
 
 def regions(bounds, B, compound=False):
     """triplet regions: a 2-beat window whose boundaries are all on the
-    quarter-triplet grid, or single beats containing 1/3 boundaries. A compound
+    quarter-triplet grid, or single beats containing 1/3 boundaries, or a half
+    beat holding 16th triplets while the other half is plain. A compound
     bar has none unless the model put notes on the triplet grid there (a bar of
     another meter in a piece with meter changes): those get quarter-beat regions"""
     regs = []
@@ -89,7 +90,17 @@ def regions(bounds, B, compound=False):
                 for bb in [h + i for i in range(-(-span.numerator // span.denominator))]:
                     end = min(bb + 1, h + span)
                     Bb = {b - bb for b in bounds if bb <= b <= end}
-                    if any(b.denominator % 3 == 0 for b in Bb):
+                    trip = {b for b in Bb if b.denominator % 3 == 0}
+                    if not trip:
+                        continue
+                    # 16th triplets in one half of the beat only (e.g. an 8th, then three
+                    # quick notes): a 3:2 bracket over that half, the other half plain
+                    half = next((hh for hh in (F(0), F(1, 2)) if end - bb == 1 and F(1, 2) in Bb
+                                 and all(hh < b < hh + F(1, 2) and (b * 6).denominator == 1 for b in trip)
+                                 and all((b * 4).denominator == 1 for b in Bb - trip)), None)
+                    if half is not None:
+                        regs.append((bb + half, bb + half + F(1, 2), F(1, 6)))
+                    else:
                         regs.append((bb, end, F(1, 3)))
         h += 2
     return regs

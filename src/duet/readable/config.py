@@ -77,6 +77,7 @@ class Config:
     hand_span: int = 14                # semitones one hand may stretch (dyads: +2)
     hand_max_notes: int = 5
     cross_over_min: int = 60           # LH attacks at/above this lying above all sounding RH notes go to the RH staff
+    cross_high: bool = True            # LH attacks too high for the bass clef (local_clef_min_ledgers) in a bar with a LH bass go to the RH staff
     hand_move_near: int = 9            # a note may change hands only if within this of that hand's context
     roll_lh_max_span: int = 19         # wider LH chords become bass-grace + chord instead of a roll
 
@@ -96,6 +97,21 @@ class Config:
     auto_keys: bool = True             # key signatures from the notes (keyfit) instead of the model's
     auto_spelling: bool = True         # notes outside the key spelled from harmony and line (spellfit)
     auto_runs: bool = True             # brushed notes in runs as grace notes, one-place overlaps cut
+    auto_gliss: bool = True            # glissandi written as a glissando line between their two ends
+    auto_chords: bool = True           # notes played together but written apart joined into one chord
+    gliss_min_notes: int = 8           # notes of one key colour in a row, one direction
+    gliss_min_span: int = 12           # semitones (an octave)
+    gliss_gap: float = 0.07            # s between two notes of the glissando at most (one missed key)
+    gliss_mean_gap: float = 0.045      # s between notes on average at most
+    gliss_disorder: float = 0.02       # s a note of the glissando may be transcribed before the previous one
+    gliss_coverage: float = 0.7        # share of the keys in the range a glissando / scale run must play
+    scale_run_min_notes: int = 8       # review only: fast runs on a major scale (glissando or fingered?)
+    scale_run_min_span: int = 12
+    scale_run_mean_gap: float = 0.045     # as fast as a glissando: fingered scales run at 50-70 ms a note
+    chord_split_ms: float = 15.0       # notes played this close are one chord
+    duple_tol: float = 0.06            # beat: largest playing error for a 16th / 32nd proposal (review)
+    duple_bias: float = 0.02           # beat: how much worse than the tuplet a simpler writing may fit
+    odd_beat_tol: float = 0.2          # beat: largest deviation from even spacing for a 5:4 / 7:4 tuplet proposal (review)
     key_switch: float = 10.0
     key_per_fifth: float = 0.3
     key_model_cost: float = 0.05
@@ -120,19 +136,8 @@ class Config:
     closing_bars: int = 4              # slow-downs reaching into the last bars stay a "rit."
     rit_ratio: float = 0.9             # bar tempo below ratio * current mark -> "rit."
     a_tempo_ratio: float = 0.96
+    rit_min_bars: int = 2              # a slow-down shorter than this many bars gets no rit. / a tempo
 
-
-    # ---- glissandi --------------------------------------------------------------
-    auto_gliss: bool = True            # write glissandi (fast runs on one key colour) as glissando lines (gliss.find)
-    gliss_min_notes: int = 10          # notes of one key colour in a row, one direction
-    gliss_min_span: int = 24           # semitones (two octaves: shorter fast runs stay written out)
-    gliss_gap: float = 0.07            # s between two notes of the run at most (one missed key allowed)
-    gliss_mean_gap: float = 0.045      # s between notes on average at most
-    gliss_disorder: float = 0.02       # s a note may be transcribed before the previous one
-    gliss_coverage: float = 0.7        # share of the keys in the range the run must play
-    scale_run_min_notes: int = 8       # review only: fast runs on a major scale (glissando or fingered?)
-    scale_run_min_span: int = 12
-    scale_run_mean_gap: float = 0.045  # as fast as a glissando: fingered scales run at 50-70 ms a note
 
     def __post_init__(self):
         for f in fields(self):
