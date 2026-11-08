@@ -165,6 +165,7 @@ def cross_over(notes, ctx):
             if max(chord) - min(chord) > cfg.hand_span or len(chord) > cfg.hand_max_notes:
                 continue
         for n in grp:
+            n.setdefault('original_staff', n['staff'])
             n['staff'] = 0; n['crossed'] = 'high' if t in high else True
         moved += len(grp)
         ctx.log(f"LH {'too high for the bass clef' if t in high else 'above RH'} -> RH staff "

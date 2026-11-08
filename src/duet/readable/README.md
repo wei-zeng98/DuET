@@ -1,6 +1,6 @@
 # Readable engraving
 
-Engraving 1.2.13, the same version as the engraving project (`engrave`). The modules are copied from that project by its `tools/sync_duet.py`, which leaves out the code only that project uses (edits files and the diagnostic faithful mode); the two adapters are maintained here: `inputs.py` takes the inputs in memory from DuET’s validated MIDI reader and frame predictions (`Inputs.from_prediction`, which copies the raw score arrays and keeps exact input-note alignment, including FIFO overlap pairing and invalid-event cleanup), and `pipeline.run(inp, out_dir, title)` keeps the diagnostic log in memory and writes only `score.musicxml` and `score.review.json` (published by `duet.engraving` as `review.json`).
+Engraving 1.3.0. The modules originate from the engraving project (`engrave`), copied by its `tools/sync_duet.py`, which leaves out the code only that project uses (edits files and the diagnostic faithful mode); the two adapters are maintained here: `inputs.py` takes the inputs in memory from DuET’s validated MIDI reader and frame predictions (`Inputs.from_prediction`, which copies the raw score arrays and keeps exact input-note alignment, including FIFO overlap pairing and invalid-event cleanup), and `pipeline.run(inp, out_dir, title)` keeps the diagnostic log in memory and writes only `score.musicxml` and `score.review.json` (published by `duet.engraving` as `review.json`).
 
 Since 1.1.0 the engraving takes key signatures from the notes (`keyfit`), spells notes outside the key from their harmony and line (`spellfit`), and in fast runs writes an isolated brushed note as a grace note and cuts one-place overlaps (`runs`); places it is not sure about are listed in `review.json` with the edits (`edits.py` format) for each answer (`review.py`). On the engraving project's 148-piece test set this raised correct spelling from 94.8% to 97.4% and key-signature agreement from 67% to 77%, with note rhythms unchanged.
 
@@ -77,3 +77,20 @@ Since 1.2.5 a left-hand figure too high for the bass clef, in a bar whose left h
 Since 1.2.6 `review.json` also lists beats with 5 or 7 notes played about evenly, offering one 5:4 / 7:4 tuplet per beat.
 
 Since 1.2.8 glissandi are written as described under Glissandi above (#9).
+
+
+Engraving 1.3.0 fixes notation safety issues:
+- A glissando is compressed only when its two endpoints fit before the next attack.
+  If no grid position is available, all notes remain written out and a
+  `glissando-unplaced` review item explains why. Stop-note lengths are capped again
+  after voice cleanup. A later unsafe endpoint restarts engraving from the original
+  inputs with gliss compression disabled, recorded in `summary.gliss_fallback`.
+- Crossed LH figures reserve their own voice over actual occupied intervals.
+  A real second-voice conflict keeps the contiguous figure on its original staff
+  and emits `cross-staff-conflict`; a disjoint voice elsewhere in the bar does not
+  force the figure onto RH stems. `original_staff` preserves the source staff.
+- `summary.half_bar_shift` records eligibility, frame vote and the applied offset.
+  The half-bar share and gliss coverage controls accept only values in [0, 1].
+
+The keyfit configuration in `docs/engraving-keyfit-val-candidate.json` can be
+selected with `--engraving-config`.

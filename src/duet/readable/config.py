@@ -164,8 +164,9 @@ class Config:
         for name in ('spelling_window', 'spelling_passes', 'key_borrowed_max_bars'):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
-        if self.key_borrowed_share > 1:
-            raise ValueError("key_borrowed_share must be between zero and one")
+        for name in ('key_borrowed_share', 'half_bar_share', 'half_bar_max_on_bar', 'gliss_coverage'):
+            if getattr(self, name) > 1:
+                raise ValueError(f"{name} must be between zero and one")
 
     @classmethod
     def from_dict(cls, values):

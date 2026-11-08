@@ -141,19 +141,34 @@ def run(inp, out_dir, title=None, cfg=None):
                                     for k, v in original.items()})
         return _run(fresh, out_dir, title, config)
 
-    try:
-        xml, summary = attempt(cfg)
-    except BarMappingError as exc:
-        if not cfg.grid_count_fix and not cfg.snap_bar_lines:
-            raise
-        xml, summary = attempt(replace(cfg, grid_count_fix=False, snap_bar_lines=False))
-        reason = str(exc)
+    effective = cfg
+    grid_reason = gliss_reason = None
+    while True:
+        try:
+            xml, summary = attempt(effective)
+            break
+        except BarMappingError as exc:
+            if not effective.grid_count_fix and not effective.snap_bar_lines:
+                raise
+            grid_reason = str(exc)
+            effective = replace(effective, grid_count_fix=False, snap_bar_lines=False)
+        except gliss.UnsafeGlissError as exc:
+            if not effective.auto_gliss:
+                raise
+            gliss_reason = str(exc)
+            effective = replace(effective, auto_gliss=False)
+    summary['grid_fallback'] = dict(applied=False)
+    summary['gliss_fallback'] = dict(applied=False)
+    if grid_reason is not None:
         summary['warnings'].append('WARNING grid: rejected count correction; '
-                                   'restarted with model bar boundaries: ' + reason)
-        summary['grid_fallback'] = dict(applied=True, reason=reason,
-                                        action='restart_with_original_bar_geometry')
-    else:
-        summary['grid_fallback'] = dict(applied=False)
+                                   'restarted with model bar boundaries: ' + grid_reason)
+        summary['grid_fallback'] = dict(applied=True, reason=grid_reason,
+                                       action='restart_with_original_bar_geometry')
+    if gliss_reason is not None:
+        summary['warnings'].append('WARNING gliss: rejected unsafe endpoint; '
+                                   'restarted with all runs written out: ' + gliss_reason)
+        summary['gliss_fallback'] = dict(applied=True, reason=gliss_reason,
+                                        action='restart_without_gliss_compression', effective_auto_gliss=False)
     return xml, summary
 
 
@@ -263,6 +278,12 @@ def _run(inp, out_dir, title=None, cfg=None):
     log(f"playability: {stats}")
     layers = {st: assign(notes, st, ctx) for st in (0, 1)}
 
+    for conflict in getattr(ctx, 'cross_staff_conflicts', []):
+        rv.add('cross-staff-conflict', 'medium', rv.bars([ctx.bar_of(conflict['on'])]),
+               'The second voice was occupied; keep this LH figure on its original staff?',
+               f"pitches {conflict['pitches']}, input IDs {conflict['input_ids']}",
+               'kept the figure on its original staff', [dict(label='keep', edit=None)])
+
     # a very low bass grace before a treble-register LH chord reads badly in any clef
     lh_at = defaultdict(list)
     for n in layers[1]:
@@ -337,5 +358,6 @@ def _run(inp, out_dir, title=None, cfg=None):
                    onsets_within_0_06_beat=f"{exact}/{sum(not n['grace'] for n in notes)}",
                    playability=stats, notes_with_many_ledgers=len(worst),
                    warnings=None)
+    summary['half_bar_shift'] = dict(enabled=cfg.half_bar_shift, eligible=model_bars is None, vote=vote, applied=bool(half_shift), offset_beats=half_shift)
     summary['warnings'] = [line.strip() for line in logf.getvalue().splitlines() if line.startswith('WARNING')]
     return xml_path, summary

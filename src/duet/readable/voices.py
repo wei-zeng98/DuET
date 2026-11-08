@@ -30,7 +30,9 @@ def assign(notes, staff, ctx):
     notes."""
     end_beat = ctx.END
     S = sorted([n for n in notes if n['staff'] == staff and not n['grace']], key=lambda n: (n['on'], n['pitch']))
-    onsets = sorted(set(n['on'] for n in S))
+    # Crossed LH notes already have their own voice; do not use them to
+    # manufacture a sustained RH second voice before resolving collisions.
+    onsets = sorted(set(n['on'] for n in S if n.get('crossed') != 'high'))
     other_on = sorted(set(n['on'] for n in notes if n['staff'] != staff and not n['grace']))
 
     def next_on(o):
@@ -74,12 +76,30 @@ def assign(notes, staff, ctx):
             if not restrike:
                 n['layer'] = 'B'
 
-    # the staff has two voices: where the second already holds this staff's own notes (sustained notes, triplets),
-    # the crossed LH figure goes back into the first, as before 1.2.13
-    own_b = {ctx.bar_of(n['on']) for n in S if n['layer'] == 'B' and n.get('crossed') != 'high'}
-    for n in S:
-        if n.get('crossed') == 'high' and ctx.bar_of(n['on']) in own_b:
-            n['layer'] = 'A'
+    # Reserve B only over the intervals actually occupied by this staff's
+    # own material. Keep each contiguous crossed figure together; if it really
+    # needs a third simultaneous voice, leave the figure on its original staff.
+    own_b = [n for n in S if n['layer'] == 'B' and n.get('crossed') != 'high']
+    figures = []
+    for n in (n for n in S if n.get('crossed') == 'high'):
+        if (not figures or n['on'] - figures[-1][-1]['on'] > F(1, 2)
+                or ctx.bar_of(n['on']) != ctx.bar_of(figures[-1][-1]['on'])):
+            figures.append([])
+        figures[-1].append(n)
+    for figure in figures:
+        collision = any(a['on'] < b['on'] + b['dur'] and b['on'] < a['on'] + a['dur']
+                        for a in figure for b in own_b)
+        if collision:
+            if not hasattr(ctx, 'cross_staff_conflicts'):
+                ctx.cross_staff_conflicts = []
+            ctx.cross_staff_conflicts.append(dict(on=figure[0]['on'], pitches=[n['pitch'] for n in figure],
+                                                 input_ids=[n.get('i') for n in figure]))
+            for n in figure:
+                n['staff'] = n.get('original_staff', 1)
+                n.pop('crossed', None)
+            ctx.log(f"crossed LH figure kept on its original staff: second voice occupied ({ctx.where(figure[0]['on'])})")
+    S = [n for n in S if n['staff'] == staff]
+    other_on = sorted(set(n['on'] for n in notes if n['staff'] != staff and not n['grace']))
 
     spans = getattr(ctx, 'gliss_spans', [])
     gliss.split_layers(S, staff, spans)
@@ -123,4 +143,5 @@ def assign(notes, staff, ctx):
             for m in S:
                 if m['layer'] == 'A' and m['pitch'] == n['pitch'] and n['on'] < m['on'] < n['on'] + n['dur']:
                     n['dur'] = m['on'] - n['on']
+    gliss.cap_endpoints(S)
     return S

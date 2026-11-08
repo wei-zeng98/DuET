@@ -1,3 +1,3 @@
-"""Readable piano engraving: engraving 1.2.13 (the same version as the engraving project)."""
+"""Readable piano engraving: engraving 1.3.0."""
 
-__version__ = "1.2.13"
+__version__ = "1.3.0"

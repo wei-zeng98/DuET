@@ -123,6 +123,7 @@ def apply(notes, runs, ctx, scale_runs=()):
     which goes on the 16th nearest to where it was played. Each end stays on its own staff, so the line can cross."""
     ctx.gliss_spans = []
     ctx.gliss_detected = []
+    ctx.gliss_rejected = []
     ctx.gliss_scale_runs = []
     last_end = None
     for number, run in enumerate(runs, 1):
@@ -137,12 +138,17 @@ def apply(notes, runs, ctx, scale_runs=()):
         end = snap(last['x'])
         if last_end is not None and start <= last_end:
             start = last_end + POSITION_GRID
+        # Resolve the minimum span before checking space before the next attack.
+        end = max(end, start + POSITION_GRID)
         nearest = end
         end, room = _before_next(notes, found, last, start, end)
+        if end is None:
+            reason = 'no grid position between the start and the following attack'
+            ctx.gliss_rejected.append((first, last, len(found), start, reason))
+            ctx.log(f"WARNING gliss: run {number} left written out: {reason}")
+            continue
         if end != nearest:
             ctx.log(f"gliss: run {number} end moved from {ctx.where(nearest)} to {ctx.where(end)}, before the next note")
-        if end <= start:
-            end = start + POSITION_GRID
         last_end = end
         line = (number - 1) % 6 + 1
         first.update(on=start, dur=end - start)
@@ -176,13 +182,13 @@ def _before_next(notes, found, last, start, end):
     if not later:
         return end, None
     following = min(later)
-    if end < following:
+    if start < end < following and following - end >= F(1, 12):
         return end, following - end
     for step in (F(1, 2), POSITION_GRID):
         candidate = (following - POSITION_GRID) // step * step
         if start < candidate < following:
             return candidate, following - candidate
-    return end, None
+    return None, None
 
 
 def replace_crossing_notes(notes, ctx):
@@ -206,6 +212,11 @@ def replace_crossing_notes(notes, ctx):
 def review_items(rv, ctx):
     """Every detected run is a question: a wrong one has taken notes off the page. A fast run on a major scale is asked
     about too, but left written out."""
+    for first, last, count, start, reason in getattr(ctx, 'gliss_rejected', []):
+        rv.add('glissando-unplaced', 'medium', rv.bars([ctx.bar_of(start)]),
+               'A possible glissando was left written out: should it be engraved manually?',
+               f"{count} notes from {first['pitch']} to {last['pitch']}: {reason}",
+               'kept all notes', [dict(label='keep the notes', edit=None)])
     for first, last, count, scale, start in ctx.gliss_detected:
         bar = ctx.bar_of(start)
         rv.add('glissando', 'medium', rv.bars([bar]),
@@ -233,6 +244,8 @@ def finish(notes):
     for note in notes:
         if 'gliss' in note:
             note['staff'] = note['gliss_staff']
+            if note.get('original_staff') == note['staff']:
+                note.pop('crossed', None)
             if note['gliss_scale'] == 'white':
                 note['spell'] = natural_spelling(note['pitch'])
 
@@ -266,3 +279,21 @@ def notation(note, is_attack, is_last_piece):
     if kind == 'start' and is_last_piece:
         return f'<glissando type="start" line-type="wavy" number="{number}">gliss.</glissando>'
     return ''
+
+
+class UnsafeGlissError(ValueError):
+    """Downstream notation no longer has safe room for a detected glissando."""
+
+
+def cap_endpoints(notes):
+    """Keep stop-note lengths within their validated space after voice cleanup."""
+    for note in notes:
+        if note.get('gliss') != 'stop':
+            continue
+        later = [n['on'] for n in notes if n is not note and n['staff'] == note['staff']
+                 and not n['grace'] and n['t'] > note['t']]
+        if later:
+            room = min(later) - note['on']
+            if room <= 0:
+                raise UnsafeGlissError('Glissando endpoint no longer precedes the next attack')
+            note['dur'] = min(note['dur'], room)
