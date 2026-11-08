@@ -65,6 +65,28 @@ def _chains(notes, scale_of, min_notes, min_span, gap, mean_gap, disorder, cover
     return out
 
 
+def _join(runs, cfg):
+    """One glissando the transcription broke in two: a few keys in the middle were missed, so the chain (next or
+    next-but-one key) stops. Join two runs on the same key colour and in the same direction when the second starts
+    within gliss_gap s of the end of the first and at most gliss_join_keys keys further on
+    (performance(2).mid: D7 to C6, B5 and A5 missed, G5 to E4)."""
+    out = []
+    for run in runs:
+        if out:
+            prev = out[-1]
+            (t0, p0), (t1, p1) = prev['notes'][-1], run['notes'][0]
+            d_prev = prev['notes'][-1][1] - prev['notes'][0][1]
+            d_run = run['notes'][-1][1] - run['notes'][0][1]
+            scale = WHITE_KEYS if prev['scale'] == 'white' else BLACK_KEYS
+            between = sum(1 for p in range(min(p0, p1) + 1, max(p0, p1)) if p % 12 in scale)
+            if prev['scale'] == run['scale'] and d_prev * d_run > 0 and (p1 - p0) * d_prev > 0 \
+                    and 0 <= t1 - t0 <= cfg.gliss_gap and between <= cfg.gliss_join_keys:
+                prev['notes'] = prev['notes'] + run['notes']
+                continue
+        out.append(run)
+    return out
+
+
 def find(perf, cfg):
     """Glissandi and fast major-scale runs in a performance, each as {notes: [[seconds, pitch], ...], scale}.
 
@@ -79,6 +101,7 @@ def find(perf, cfg):
         taken.update(id(note) for note in chain)
         runs.append(dict(notes=[[n['t'], n['pitch']] for n in chain],
                          scale='white' if chain[0]['pitch'] % 12 in WHITE_KEYS else 'black'))
+    runs = _join(sorted(runs, key=lambda run: run['notes'][0][0]), cfg)
     found = []                                      # runs on every major scale; the scale playing most notes wins
     for root in range(1, 12):                       # C major is the white keys
         scale = tuple(sorted((root + step) % 12 for step in WHITE_KEYS))

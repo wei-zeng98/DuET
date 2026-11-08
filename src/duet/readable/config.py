@@ -108,6 +108,7 @@ class Config:
     gliss_gap: float = 0.07            # s between two notes of the glissando at most (one missed key)
     gliss_mean_gap: float = 0.045      # s between notes on average at most
     gliss_disorder: float = 0.02       # s a note of the glissando may be transcribed before the previous one
+    gliss_join_keys: int = 3           # keys missed between two runs that are still one glissando (gliss._join)
     gliss_coverage: float = 0.7        # share of the keys in the range a glissando / scale run must play
     scale_run_min_notes: int = 8       # review only: fast runs on a major scale (glissando or fingered?)
     scale_run_min_span: int = 12

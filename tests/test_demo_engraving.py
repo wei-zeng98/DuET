@@ -26,7 +26,7 @@ class DemoEngravingTests(unittest.TestCase):
                     {
                         "engraving": {
                             "mode": "readable",
-                            "version": "1.3.0",
+                            "version": "1.3.1",
                             "summary": {"bars": 2},
                         }
                     }
@@ -52,6 +52,6 @@ class DemoEngravingTests(unittest.TestCase):
             self.assertEqual((folder / "score.musicxml").read_bytes(), xml)
             metadata = json.loads((folder / "report.json").read_text())["engraving"]
             self.assertEqual(metadata["mode"], "readable")
-            self.assertEqual(metadata["version"], "1.3.0")
+            self.assertEqual(metadata["version"], "1.3.1")
             self.assertEqual(metadata["summary"], {"bars": 2})
             self.assertEqual(metadata["source"], "score.musicxml")

@@ -1,6 +1,6 @@
 # Readable engraving
 
-Engraving 1.3.0. The modules originate from the engraving project (`engrave`), copied by its `tools/sync_duet.py`, which leaves out the code only that project uses (edits files and the diagnostic faithful mode); the two adapters are maintained here: `inputs.py` takes the inputs in memory from DuET’s validated MIDI reader and frame predictions (`Inputs.from_prediction`, which copies the raw score arrays and keeps exact input-note alignment, including FIFO overlap pairing and invalid-event cleanup), and `pipeline.run(inp, out_dir, title)` keeps the diagnostic log in memory and writes only `score.musicxml` and `score.review.json` (published by `duet.engraving` as `review.json`).
+Engraving 1.3.1, the same version as the engraving project (`engrave`). The modules originate from the engraving project (`engrave`), copied by its `tools/sync_duet.py`, which leaves out the code only that project uses (edits files and the diagnostic faithful mode); the two adapters are maintained here: `inputs.py` takes the inputs in memory from DuET’s validated MIDI reader and frame predictions (`Inputs.from_prediction`, which copies the raw score arrays and keeps exact input-note alignment, including FIFO overlap pairing and invalid-event cleanup), and `pipeline.run(inp, out_dir, title)` keeps the diagnostic log in memory and writes only `score.musicxml` and `score.review.json` (published by `duet.engraving` as `review.json`).
 
 Since 1.1.0 the engraving takes key signatures from the notes (`keyfit`), spells notes outside the key from their harmony and line (`spellfit`), and in fast runs writes an isolated brushed note as a grace note and cuts one-place overlaps (`runs`); places it is not sure about are listed in `review.json` with the edits (`edits.py` format) for each answer (`review.py`). On the engraving project's 148-piece test set this raised correct spelling from 94.8% to 97.4% and key-signature agreement from 67% to 77%, with note rhythms unchanged.
 
@@ -94,3 +94,5 @@ Engraving 1.3.0 fixes notation safety issues:
 
 The keyfit configuration in `docs/engraving-keyfit-val-candidate.json` can be
 selected with `--engraving-config`.
+
+Since 1.3.1 a glissando the transcription broke in two (a few keys missed in the middle, so the key-by-key chain stops) is joined back into one line: two runs on the same key colour and in the same direction, the second starting within `gliss_gap` s of the end of the first and at most `gliss_join_keys` (3) keys further on.
