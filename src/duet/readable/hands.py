@@ -149,6 +149,13 @@ def cross_over(notes, ctx):
             # written in its own voice on the RH staff: it only must not double a RH attack
             if any(n['pitch'] == r['pitch'] and r['on'] == t for n in grp for r in rh):
                 continue
+            # nor fall below a RH passage that is all in the 8va register: it would break the 8va line and
+            # leave chords two octaves wide (performance(1).mid m1: F#4-D5 under a RH run from A5 to C#7)
+            bar_rh = [r['pitch'] for r in rh if ctx.bar_of(r['on']) == ctx.bar_of(t)]
+            lo_min, need = cfg.ottava_rh
+            if bar_rh and min(bar_rh) >= lo_min and lo < lo_min and \
+                    (sum(p >= need for p in bar_rh) >= 2 or max(bar_rh) >= need + 3):
+                continue
         else:
             sounding = [n['pitch'] for n in rh if n['on'] <= t < n['on'] + n['dur']]
             if not held or not sounding or lo <= max(sounding):
@@ -158,7 +165,7 @@ def cross_over(notes, ctx):
             if max(chord) - min(chord) > cfg.hand_span or len(chord) > cfg.hand_max_notes:
                 continue
         for n in grp:
-            n['staff'] = 0; n['crossed'] = True
+            n['staff'] = 0; n['crossed'] = 'high' if t in high else True
         moved += len(grp)
         ctx.log(f"LH {'too high for the bass clef' if t in high else 'above RH'} -> RH staff "
                 f"{sorted(n['pitch'] for n in grp)} ({ctx.where(t)})")

@@ -41,7 +41,9 @@ def assign(notes, staff, ctx):
 
     frac = lambda o: o - o.numerator // o.denominator
     for n in S:
-        n['layer'] = 'A'
+        # a LH figure written on the RH staff because it is too high for the bass clef (hands.cross_over) is the LH's
+        # own voice: on the RH's stems it would read as RH chords (performance(1).mid m1: F#4-D5 under F#6)
+        n['layer'] = 'B' if n.get('crossed') == 'high' else 'A'
     halves = defaultdict(list)
     for n in S:
         halves[ctx.half_index(n['on'])].append(n)
@@ -71,6 +73,13 @@ def assign(notes, staff, ctx):
             restrike = any(m['pitch'] == n['pitch'] and nx <= m['on'] < n['on'] + n['dur'] for m in S if m is not n)
             if not restrike:
                 n['layer'] = 'B'
+
+    # the staff has two voices: where the second already holds this staff's own notes (sustained notes, triplets),
+    # the crossed LH figure goes back into the first, as before 1.2.13
+    own_b = {ctx.bar_of(n['on']) for n in S if n['layer'] == 'B' and n.get('crossed') != 'high'}
+    for n in S:
+        if n.get('crossed') == 'high' and ctx.bar_of(n['on']) in own_b:
+            n['layer'] = 'A'
 
     spans = getattr(ctx, 'gliss_spans', [])
     gliss.split_layers(S, staff, spans)
