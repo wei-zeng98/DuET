@@ -132,12 +132,10 @@ lines) are independent (all enabled by default). Use `--key-switch`, `--key-mode
 If you use DuET in your research, please cite our paper:
 
 ```bibtex
-@misc{zeng2026duetnoteframedualencoding,
-      title={DuET: Note-Frame Dual Encoding for Piano Performance-to-Score Transcription},
-      author={Wei Zeng and Ye Wang},
-      year={2026},
-      eprint={2610.21467},
-      archivePrefix={arXiv},
-      url={https://arxiv.org/abs/2610.21467},
+@article{zeng2026duet,
+  title={{DuET}: Note-Frame Dual Encoding for Piano Performance-to-Score Transcription},
+  author={Zeng, Wei and Wang, Ye},
+  journal={arXiv preprint arXiv:2610.21467},
+  year={2026}
 }
 ```
